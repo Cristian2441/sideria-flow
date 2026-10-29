@@ -1,15 +1,3 @@
-/**
- * GET  /api/purchase-requests        → HU-06: listar solicitudes de la empresa
- * POST /api/purchase-requests        → HU-05: crear solicitud de compra
- *
- * Reglas de negocio:
- * - Solo REQUESTER puede crear (permissionGuard CREATE_REQUEST).
- * - Todos los roles pueden listar (permissionGuard LIST_REQUESTS).
- * - El companyId viene SIEMPRE del JWT (nunca del body).
- * - total_amount lo calcula el trigger de BD.
- * - La solicitud siempre nace en DRAFT (trigger force_draft_on_insert).
- */
-
 import { NextRequest } from "next/server";
 import { db } from "@/prisma/db";
 import { apiError, apiSuccess } from "@/lib/api-response";
@@ -19,16 +7,13 @@ import {
   listRequestsQuerySchema,
 } from "@/lib/schemas/request.schema";
 
-// ─── GET /api/purchase-requests ──────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  // 1. Autenticación (todos los roles pueden listar)
   const guard = await permissionGuard(undefined, "LIST_REQUESTS");
   if (!guard.ok) return guard.response;
   const { session } = guard;
   const companyId = getCompanyId(session);
 
-  // 2. Parsear query params (filtros)
   const { searchParams } = request.nextUrl;
   const parsed = listRequestsQuerySchema.safeParse({
     search:     searchParams.get("search")     ?? undefined,
@@ -48,11 +33,9 @@ export async function GET(request: NextRequest) {
 
   const { search, status, costCenter, minAmount, maxAmount, page, pageSize } = parsed.data;
 
-  // 3. Construir y ejecutar query filtrada por companyId del JWT
   let query = db.orm.public.PurchaseRequest
     .where((r) => r.companyId.eq(companyId));
 
-  // HU-10: REQUESTER solo ve sus propias solicitudes; MANAGER y FINANCE ven todas las de la empresa
   if (session.role === "REQUESTER") {
     query = query.where((r) => r.requesterId.eq(session.userId));
   }
@@ -70,7 +53,6 @@ export async function GET(request: NextRequest) {
     )
     .all();
 
-  // HU-11: Búsqueda por texto libre en título y descripción
   if (search) {
     const q = search.toLowerCase();
     allItems = allItems.filter(
@@ -80,10 +62,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Ordenar por createdAt desc (Prisma 8 RC no tiene .orderBy())
   allItems.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
-  // 4. Paginación manual
   const total = allItems.length;
   const offset = (page - 1) * pageSize;
   const items = allItems.slice(offset, offset + pageSize);
@@ -99,16 +79,12 @@ export async function GET(request: NextRequest) {
   });
 }
 
-// ─── POST /api/purchase-requests ─────────────────────────────────────────────
-
 export async function POST(request: NextRequest) {
-  // 1. Solo REQUESTER puede crear solicitudes (HU-03)
   const guard = await permissionGuard(undefined, "CREATE_REQUEST");
   if (!guard.ok) return guard.response;
   const { session } = guard;
-  const companyId = getCompanyId(session);   // HU-02: companyId del JWT
+  const companyId = getCompanyId(session);   
 
-  // 2. Parsear y validar body
   let body: unknown;
   try {
     body = await request.json();
@@ -125,24 +101,20 @@ export async function POST(request: NextRequest) {
 
   const { title, description, costCenter, items } = parsed.data;
 
-  // 3. Crear solicitud en DRAFT (el trigger force_draft_on_insert lo garantiza)
   const requestId = crypto.randomUUID();
 
   await db.orm.public.PurchaseRequest.create({
     id: requestId,
-    companyId,                     // del JWT, no del cliente
-    requesterId: session.userId,   // del JWT
+    companyId,                     
+    requesterId: session.userId,   
     title,
     description,
     costCenter,
     source: "WEB",
     externalId: null,
     payloadHash: null,
-    // status = DRAFT por defecto (trigger)
-    // totalAmount calculado por trigger tras insertar ítems
   });
 
-  // 4. Insertar ítems (el trigger sync_request_total_amount recalcula el total)
   for (const item of items) {
     await db.orm.public.RequestItem.create({
       id: crypto.randomUUID(),
@@ -154,7 +126,6 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // 5. Leer la solicitud ya con el total calculado por el trigger
   const created = await db.orm.public.PurchaseRequest
     .where((r) => r.id.eq(requestId))
     .select(

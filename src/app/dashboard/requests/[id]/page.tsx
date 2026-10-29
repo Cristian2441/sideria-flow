@@ -1,9 +1,3 @@
-/**
- * HU-11: Detalle de solicitud de compra.
- * HU-12: Acciones según rol y estado (editar, enviar, aprobar, rechazar).
- * HU-07: Timeline del historial de aprobación.
- */
-
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
@@ -12,7 +6,6 @@ import { APPROVAL_THRESHOLD } from "@/lib/types";
 import ReviewForm from "./ReviewForm";
 import SubmitButton from "./SubmitButton";
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
 
 interface RequestItem {
   id: string;
@@ -55,7 +48,6 @@ interface RequestDetail {
   history: HistoryEntry[];
 }
 
-// ─── Helpers visuales ─────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<PurchaseRequestStatus, { label: string; color: string; bg: string }> = {
   DRAFT:           { label: "Borrador",     color: "#a1a1aa", bg: "rgba(161,161,170,0.12)" },
@@ -99,8 +91,6 @@ function formatDate(iso: string) {
   });
 }
 
-// ─── Página ──────────────────────────────────────────────────────────────────
-
 export default async function RequestDetailPage({
   params,
 }: {
@@ -112,7 +102,6 @@ export default async function RequestDetailPage({
   const { id } = await params;
   const role = session.role as UserRole;
 
-  // Fetch del detalle
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
@@ -128,7 +117,6 @@ export default async function RequestDetailPage({
 
   const { data: pr } = (await res.json()) as { data: RequestDetail };
 
-  // Determinar acciones disponibles según rol y estado
   const canEdit   = role === "REQUESTER" && pr.status === "DRAFT" && pr.requesterId === session.userId;
   const canSubmit = role === "REQUESTER" && pr.status === "DRAFT" && pr.requesterId === session.userId;
   const canReviewManager = role === "MANAGER" && pr.status === "PENDING_MANAGER" && pr.requesterId !== session.userId;
@@ -137,7 +125,6 @@ export default async function RequestDetailPage({
 
   return (
     <div className="detail-page-container">
-      {/* Breadcrumb */}
       <Link href="/dashboard/requests" style={{ fontSize: "12px", color: "var(--muted)", textDecoration: "none" }}>
         ← Volver a solicitudes
       </Link>
@@ -165,7 +152,6 @@ export default async function RequestDetailPage({
         }
       `}</style>
 
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginTop: "16px", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
         <div>
           <h1 style={{ fontSize: "20px", fontWeight: "700", margin: 0, marginBottom: "8px" }}>
@@ -197,10 +183,8 @@ export default async function RequestDetailPage({
       </div>
 
       <div className="detail-grid">
-        {/* ── Columna principal ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          {/* Descripción */}
           <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px" }}>
             <h2 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "10px" }}>
               Descripción
@@ -210,7 +194,6 @@ export default async function RequestDetailPage({
             </p>
           </section>
 
-          {/* Productos */}
           <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px" }}>
             <h2 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px" }}>
               Productos ({pr.items.length})
@@ -244,12 +227,10 @@ export default async function RequestDetailPage({
             </div>
           </section>
 
-          {/* Acciones de aprobación (MANAGER / FINANCE) */}
           {canReview && (
             <ReviewForm requestId={pr.id} />
           )}
 
-          {/* Acciones del solicitante */}
           {canSubmit && (
             <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px" }}>
               <h2 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px" }}>
@@ -261,7 +242,7 @@ export default async function RequestDetailPage({
                     href={`/dashboard/requests/${pr.id}/edit`}
                     style={{ padding: "8px 16px", borderRadius: "7px", background: "var(--neutral-700)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: "500", textDecoration: "none" }}
                   >
-                    ✏️ Editar
+                     Editar
                   </Link>
                 )}
                 <SubmitButton requestId={pr.id} />
@@ -331,7 +312,6 @@ export default async function RequestDetailPage({
               </div>
             )}
 
-            {/* Metadatos */}
             <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "6px" }}>
               {pr.requester && <MetaRow label="Solicitante" value={pr.requester.name} />}
               <MetaRow label="Creada" value={formatDate(pr.createdAt)} />
@@ -352,8 +332,3 @@ function MetaRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-// ─── Botón de envío a aprobación (client component) ───────────────────────────
-// Se importa desde un archivo separado para poder usar hooks (useRouter).
-// Ver: ./SubmitButton.tsx
-
