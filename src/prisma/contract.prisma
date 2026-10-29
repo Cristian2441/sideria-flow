@@ -1,0 +1,136 @@
+// use prisma-8
+//
+// Contract adaptado al schema de Supabase (v3 endurecida).
+// Tablas: companies, users, purchase_requests, request_items,
+//         approval_history, api_keys
+//
+// NOTAS (Prisma 8 RC 21):
+// 1. PSL enums no soportados → String con alias de tipo
+// 2. Los enums REALES (role_type, request_status, request_source)
+//    ya existen en la BD creados por el SQL de Supabase.
+//    Los validamos en la capa de aplicación con Zod.
+// 3. total_amount es calculado por trigger de BD (no lo enviamos al crear)
+// 4. Los triggers de BD imponen las reglas de negocio adicionales.
+// 5. @map en cada campo camelCase → columna snake_case en la BD.
+
+// ─── Alias de tipos ──────────────────────────────────────────────────────────
+types {
+  // Roles:   REQUESTER | MANAGER | FINANCE
+  // Estados: DRAFT | PENDING_MANAGER | PENDING_FINANCE | APPROVED | REJECTED
+  // Fuentes: WEB | API
+  UserRole      = String
+  RequestStatus = String
+  RequestSource = String
+}
+
+// ─── Company ─────────────────────────────────────────────────────────────────
+model Company {
+  id        String            @id @onCreate(uuid())
+  name      String
+  createdAt TimestamptzString @default(now()) @map("created_at")
+
+  users    User[]
+  requests PurchaseRequest[]
+  apiKeys  ApiKey[]
+
+  @@map("companies")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+model User {
+  id           String            @id @onCreate(uuid())
+  companyId    String            @map("company_id")
+  email        String            @unique
+  name         String
+  passwordHash String            @map("password_hash")
+  role         UserRole
+  active       Boolean           @default(sql`true`)
+  createdAt    TimestamptzString @default(now()) @map("created_at")
+
+  company  Company           @relation(fields: [companyId], references: [id])
+  requests PurchaseRequest[] @relation("Requester")
+  history  ApprovalHistory[]
+
+  @@map("users")
+  @@index([companyId])
+}
+
+// ─── PurchaseRequest ──────────────────────────────────────────────────────────
+model PurchaseRequest {
+  id          String            @id @onCreate(uuid())
+  companyId   String            @map("company_id")
+  requesterId String            @map("requester_id")
+  title       String
+  description String
+  costCenter  String            @map("cost_center")
+  status      RequestStatus     @default(sql`'DRAFT'`)
+  totalAmount Int               @default(sql`0`) @map("total_amount")
+  source      RequestSource     @default(sql`'WEB'`)
+  externalId  String?           @map("external_id")
+  payloadHash String?           @map("payload_hash")
+  createdAt   TimestamptzString @default(now()) @map("created_at")
+  updatedAt   temporal.UpdatedAtString           @map("updated_at")
+
+  company   Company           @relation(fields: [companyId], references: [id])
+  requester User              @relation("Requester", fields: [requesterId], references: [id])
+  items     RequestItem[]
+  history   ApprovalHistory[]
+
+  @@map("purchase_requests")
+  @@unique([companyId, externalId])
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
+  @@index([companyId, requesterId])
+}
+
+// ─── RequestItem ──────────────────────────────────────────────────────────────
+model RequestItem {
+  id          String            @id @onCreate(uuid())
+  requestId   String            @map("request_id")
+  companyId   String            @map("company_id")
+  description String
+  quantity    Int
+  unitPrice   Int               @map("unit_price")
+  createdAt   TimestamptzString @default(now()) @map("created_at")
+
+  request PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@map("request_items")
+  @@index([requestId, companyId])
+}
+
+// ─── ApprovalHistory ──────────────────────────────────────────────────────────
+model ApprovalHistory {
+  id         String            @id @onCreate(uuid())
+  requestId  String            @map("request_id")
+  companyId  String            @map("company_id")
+  actorId    String            @map("actor_id")
+  fromStatus RequestStatus?    @map("from_status")
+  toStatus   RequestStatus     @map("to_status")
+  comment    String?
+  createdAt  TimestamptzString @default(now()) @map("created_at")
+
+  request PurchaseRequest @relation(fields: [requestId], references: [id])
+  actor   User            @relation(fields: [actorId], references: [id])
+
+  @@map("approval_history")
+  @@index([requestId, createdAt])
+  @@index([actorId])
+}
+
+// ─── ApiKey ──────────────────────────────────────────────────────────────────
+model ApiKey {
+  id         String             @id @onCreate(uuid())
+  companyId  String             @map("company_id")
+  name       String
+  prefix     String
+  keyHash    String             @unique @map("key_hash")
+  revokedAt  TimestamptzString? @map("revoked_at")
+  lastUsedAt TimestamptzString? @map("last_used_at")
+  createdAt  TimestamptzString  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@map("api_keys")
+  @@index([companyId])
+}

@@ -1,0 +1,212 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
+@import "tailwindcss";
+
+/* ─── Design Tokens ─────────────────────────────────────────────────────────── */
+:root {
+  /* Brand palette */
+  --brand-50:  #f0f4ff;
+  --brand-100: #e0e9ff;
+  --brand-200: #c2d3ff;
+  --brand-300: #93b0ff;
+  --brand-400: #5c82f8;
+  --brand-500: #3b5cf5;
+  --brand-600: #2a42e8;
+  --brand-700: #2031c5;
+  --brand-800: #1e2b9e;
+  --brand-900: #1e2878;
+
+  /* Neutral */
+  --neutral-950: #09090b;
+  --neutral-900: #18181b;
+  --neutral-800: #27272a;
+  --neutral-700: #3f3f46;
+  --neutral-600: #52525b;
+  --neutral-500: #71717a;
+  --neutral-400: #a1a1aa;
+  --neutral-300: #d4d4d8;
+  --neutral-200: #e4e4e7;
+  --neutral-100: #f4f4f5;
+  --neutral-50:  #fafafa;
+
+  /* Semantic */
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger:  #ef4444;
+  --info:    #06b6d4;
+
+  /* Surfaces */
+  --bg:      var(--neutral-950);
+  --surface: var(--neutral-900);
+  --border:  var(--neutral-800);
+  --text:    var(--neutral-50);
+  --muted:   var(--neutral-400);
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--neutral-700); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--neutral-600); }
+
+/* ─── Focus ──────────────────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--brand-500);
+  outline-offset: 2px;
+}
+
+/* ─── Utility classes ────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255,255,255,0.04);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.gradient-brand {
+  background: linear-gradient(135deg, var(--brand-600), var(--brand-400));
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--brand-400), #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Form base ──────────────────────────────────────────────────────────────── */
+.input {
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--neutral-800);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.input::placeholder { color: var(--muted); }
+.input:hover { border-color: var(--neutral-600); }
+.input:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px rgba(59, 92, 245, 0.15);
+}
+.input.error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--neutral-300);
+  margin-bottom: 6px;
+}
+
+.error-msg {
+  font-size: 12px;
+  color: var(--danger);
+  margin-top: 4px;
+}
+
+/* ─── Buttons ────────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-600), var(--brand-500));
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 0 20px rgba(59,92,245,0.2);
+}
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--brand-700), var(--brand-600));
+  box-shadow: 0 4px 12px rgba(59,92,245,0.35);
+  transform: translateY(-1px);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--neutral-300);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--neutral-800);
+  color: var(--text);
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(59,92,245,0.2); }
+  50%       { box-shadow: 0 0 40px rgba(59,92,245,0.4); }
+}
+
+.animate-fade-up { animation: fadeInUp 0.4s ease both; }
+.animate-spin { animation: spin 0.8s linear infinite; }
+
+/* ─── Status badges ──────────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.badge-draft    { background: rgba(113,113,122,0.15); color: var(--neutral-400); }
+.badge-pending  { background: rgba(245,158,11,0.15);  color: #fbbf24; }
+.badge-finance  { background: rgba(6,182,212,0.15);   color: var(--info); }
+.badge-approved { background: rgba(34,197,94,0.15);   color: var(--success); }
+.badge-rejected { background: rgba(239,68,68,0.15);   color: var(--danger); }
