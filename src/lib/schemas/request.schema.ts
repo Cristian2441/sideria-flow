@@ -1,11 +1,16 @@
-/**
- * Schemas Zod para solicitudes de compra (purchase requests).
- * HU-05 a HU-09, HU-13 a HU-17.
- */
-
 import { z } from "zod";
 
-// ─── Ítem de solicitud ────────────────────────────────────────────────────────
+const MAX_QUANTITY = 100_000;
+const MAX_UNIT_PRICE = 100_000_000;
+const MAX_TOTAL_CLP = 1_000_000_000_000; 
+ 
+export const REQUEST_STATUSES = [
+  "DRAFT",
+  "PENDING_MANAGER",
+  "PENDING_FINANCE",
+  "APPROVED",
+  "REJECTED",
+] as const;
 
 export const requestItemSchema = z.object({
   description: z
@@ -17,24 +22,28 @@ export const requestItemSchema = z.object({
     .number()
     .int("La cantidad debe ser un número entero")
     .min(1, "La cantidad mínima es 1")
-    .max(1_000_000, "La cantidad máxima es 1.000.000"),
+    .max(MAX_QUANTITY, `La cantidad máxima es ${MAX_QUANTITY}`),
   unitPrice: z
     .number()
     .int("El precio unitario debe ser un número entero (CLP sin decimales)")
     .min(0, "El precio no puede ser negativo")
-    .max(1_000_000_000, "El precio unitario máximo es 1.000.000.000"),
+    .max(MAX_UNIT_PRICE, `El precio unitario máximo es ${MAX_UNIT_PRICE}`),
 });
 
 export type RequestItemInput = z.infer<typeof requestItemSchema>;
 
-// ─── Crear solicitud (HU-05) ──────────────────────────────────────────────────
+const itemsArray = z
+  .array(requestItemSchema)
+  .min(1, "Debe incluir al menos un producto")
+  .max(100, "Máximo 100 productos por solicitud")
+  .refine(
+    (items) =>
+      items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0) <= MAX_TOTAL_CLP,
+    { message: "El monto total supera el máximo permitido" }
+  );
 
-export const createRequestSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(1, "El título es requerido")
-    .max(200, "Máximo 200 caracteres"),
+const requestBase = z.object({
+  title: z.string().trim().min(1, "El título es requerido").max(200, "Máximo 200 caracteres"),
   description: z
     .string()
     .trim()
@@ -45,75 +54,52 @@ export const createRequestSchema = z.object({
     .trim()
     .min(1, "El centro de costo es requerido")
     .max(100, "Máximo 100 caracteres"),
-  items: z
-    .array(requestItemSchema)
-    .min(1, "Debe incluir al menos un producto")
-    .max(100, "Máximo 100 productos por solicitud"),
+  items: itemsArray,
 });
 
+export const createRequestSchema = requestBase.strict(); 
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
-
-// ─── Editar solicitud en borrador (HU-08) ────────────────────────────────────
-
-export const updateRequestSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(1, "El título es requerido")
-    .max(200)
-    .optional(),
-  description: z
-    .string()
-    .trim()
-    .min(1, "La descripción es requerida")
-    .max(2000)
-    .optional(),
-  costCenter: z
-    .string()
-    .trim()
-    .min(1, "El centro de costo es requerido")
-    .max(100)
-    .optional(),
-  /** Si se envía items, reemplaza todos los ítems actuales */
-  items: z
-    .array(requestItemSchema)
-    .min(1, "Debe incluir al menos un producto")
-    .max(100)
-    .optional(),
-});
-
+export const updateRequestSchema = requestBase
+  .partial()
+  .strict()
+  .refine((d) => Object.keys(d).length > 0, {
+    message: "Debes enviar al menos un campo para actualizar",
+  });
 export type UpdateRequestInput = z.infer<typeof updateRequestSchema>;
-
-// ─── Filtros de listado (HU-06, HU-10) ───────────────────────────────────────
-
-export const listRequestsQuerySchema = z.object({
-  /** Texto libre: busca en título y descripción (insensible a mayúsculas) */
-  search: z.string().trim().max(200).optional(),
-  status: z
-    .enum(["DRAFT", "PENDING_MANAGER", "PENDING_FINANCE", "APPROVED", "REJECTED"])
-    .optional(),
-  costCenter: z.string().trim().optional(),
-  minAmount: z.coerce.number().int().min(0).optional(),
-  maxAmount: z.coerce.number().int().min(0).optional(),
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
-});
-
+export const listRequestsQuerySchema = z
+  .object({
+    search: z.string().trim().max(200).optional(),
+    status: z.enum(REQUEST_STATUSES).optional(),
+    costCenter: z.string().trim().max(100).optional(),
+    minAmount: z.coerce.number().int().min(0).max(MAX_TOTAL_CLP).optional(),
+    maxAmount: z.coerce.number().int().min(0).max(MAX_TOTAL_CLP).optional(),
+    // Paginación por cursor (recomendada). `page` queda solo por compatibilidad.
+    cursor: z.string().trim().max(200).optional(),
+    page: z.coerce.number().int().min(1).max(1000).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .strict()
+  .refine(
+    (d) => d.minAmount === undefined || d.maxAmount === undefined || d.minAmount <= d.maxAmount,
+    { message: "minAmount no puede ser mayor que maxAmount", path: ["minAmount"] }
+  );
 export type ListRequestsQuery = z.infer<typeof listRequestsQuerySchema>;
-
-// ─── Aprobar / Rechazar (HU-13 a HU-17) ──────────────────────────────────────
-
-export const reviewRequestSchema = z.object({
-  action: z.enum(["APPROVE", "REJECT"]),
-  comment: z
-    .string()
-    .trim()
-    .max(1000, "El comentario no puede superar 1000 caracteres")
-    .optional(),
-}).refine(
-  (data) => data.action !== "REJECT" || (data.comment && data.comment.length > 0),
-  { message: "El comentario es obligatorio al rechazar", path: ["comment"] }
-);
-
+ 
+/* ---------- Revisión ---------- */
+export const reviewRequestSchema = z
+  .object({
+    action: z.enum(["APPROVE", "REJECT"]),
+    comment: z.string().trim().max(1000, "El comentario no puede superar 1000 caracteres").optional(),
+  })
+  .strict()
+  .refine((d) => d.action !== "REJECT" || (d.comment && d.comment.length > 0), {
+    message: "El comentario es obligatorio al rechazar",
+    path: ["comment"],
+  });
 export type ReviewRequestInput = z.infer<typeof reviewRequestSchema>;
-
+ 
+/* ---------- Ingesta por API (externalId / payloadHash con límites) ---------- */
+export const apiCreateRequestSchema = createRequestSchema.extend({
+  externalId: z.string().trim().min(1).max(100),
+});
+export type ApiCreateRequestInput = z.infer<typeof apiCreateRequestSchema>;
