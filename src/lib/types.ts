@@ -1,11 +1,6 @@
-// ─── Tipos de dominio del proyecto ───────────────────────────────────────────
-// Roles y estados en inglés tal como están definidos en la BD de Supabase.
-// Las validaciones se aplican en Zod schemas y en el backend.
-
-// Roles: coinciden con el enum role_type de PostgreSQL
 export type UserRole = "REQUESTER" | "MANAGER" | "FINANCE";
 
-// Estados: coinciden con el enum request_status de PostgreSQL
+
 export type PurchaseRequestStatus =
   | "DRAFT"
   | "PENDING_MANAGER"
@@ -13,7 +8,6 @@ export type PurchaseRequestStatus =
   | "APPROVED"
   | "REJECTED";
 
-// Fuente de la solicitud: coincide con el enum request_source de PostgreSQL
 export type RequestSource = "WEB" | "API";
 
 export const USER_ROLES: UserRole[] = ["REQUESTER", "MANAGER", "FINANCE"];
@@ -26,10 +20,8 @@ export const PURCHASE_REQUEST_STATUSES: PurchaseRequestStatus[] = [
   "REJECTED",
 ];
 
-// Umbral CLP para doble aprobación (jefatura + finanzas)
 export const APPROVAL_THRESHOLD = 500_000;
 
-// ─── Interfaces de dominio ────────────────────────────────────────────────────
 
 export interface Company {
   id: string;
@@ -55,7 +47,7 @@ export interface PurchaseRequest {
   description: string;
   costCenter: string;
   status: PurchaseRequestStatus;
-  totalAmount: number; // calculado por trigger en BD, nunca enviado desde cliente
+  totalAmount: number; 
   source: RequestSource;
   externalId: string | null;
   payloadHash: string | null;

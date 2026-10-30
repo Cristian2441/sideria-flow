@@ -251,7 +251,6 @@ export default async function RequestDetailPage({
           )}
         </div>
 
-        {/* ── Columna lateral: Timeline ── */}
         <div>
           <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px" }}>
             <h2 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "16px" }}>
@@ -267,7 +266,6 @@ export default async function RequestDetailPage({
                   const cfg = STATUS_CONFIG[entry.toStatus];
                   return (
                     <div key={entry.id} style={{ display: "flex", gap: "12px" }}>
-                      {/* Línea vertical */}
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                         <div style={{
                           width: "10px", height: "10px", borderRadius: "50%",
@@ -275,7 +273,6 @@ export default async function RequestDetailPage({
                         }} />
                         {!isLast && <div style={{ width: "1px", flex: 1, background: "var(--border)", minHeight: "24px" }} />}
                       </div>
-                      {/* Contenido */}
                       <div style={{ paddingBottom: isLast ? 0 : "16px", flex: 1 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "6px" }}>
                           <span style={{ fontSize: "12px", fontWeight: "600", color: cfg.color }}>
