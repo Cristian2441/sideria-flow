@@ -99,7 +99,11 @@ export const reviewRequestSchema = z
 export type ReviewRequestInput = z.infer<typeof reviewRequestSchema>;
  
 /* ---------- Ingesta por API (externalId / payloadHash con límites) ---------- */
-export const apiCreateRequestSchema = createRequestSchema.extend({
-  externalId: z.string().trim().min(1).max(100),
-});
+export const apiCreateRequestSchema = requestBase
+  .extend({
+    companyId: z.string().optional(),
+    external_id: z.string().trim().max(100).optional(),
+    externalId: z.string().trim().max(100).optional(),
+  })
+  .strip();
 export type ApiCreateRequestInput = z.infer<typeof apiCreateRequestSchema>;

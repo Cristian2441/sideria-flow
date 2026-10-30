@@ -1,11 +1,3 @@
-"use client";
-
-/**
- * Formulario de aprobación/rechazo embebido en el detalle de solicitud.
- * HU-13 a HU-17: Aprobar o rechazar con comentario obligatorio al rechazar.
- * HU-26: Feedback y manejo de errores con Toasts y Diálogo de confirmación interactivo.
- */
-
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastProvider";
@@ -70,7 +62,6 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
         "success"
       );
 
-      // Refrescar la página para mostrar el nuevo estado y el timeline actualizado
       router.refresh();
     } catch {
       const connErr = "Error de conexión. Intenta de nuevo.";
@@ -109,7 +100,7 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
           onSubmit={handleOpenConfirmModal}
           style={{ display: "flex", flexDirection: "column", gap: "12px" }}
         >
-          {/* Botones de acción */}
+       
           <div style={{ display: "flex", gap: "8px" }}>
             <button
               type="button"
@@ -132,7 +123,7 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
                 transition: "all 0.15s",
               }}
             >
-              ✓ Aprobar
+               Aprobar
             </button>
             <button
               type="button"
@@ -155,11 +146,10 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
                 transition: "all 0.15s",
               }}
             >
-              ✗ Rechazar
+              Rechazar
             </button>
           </div>
 
-          {/* Comentario */}
           {action && (
             <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
               <label
@@ -202,7 +192,6 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
             </div>
           )}
 
-          {/* Botón para abrir modal de confirmación */}
           {action && (
             <button
               type="submit"
@@ -233,7 +222,6 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
         </form>
       </section>
 
-      {/* HU-26: Diálogo modal de confirmación al aprobar o rechazar */}
       {showConfirmModal && (
         <div
           role="dialog"

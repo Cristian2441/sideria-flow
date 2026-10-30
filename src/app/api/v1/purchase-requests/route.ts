@@ -29,7 +29,7 @@ import { db } from "@/prisma/db";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { apiKeyGuard } from "@/lib/api-key-guard";
 import { checkRateLimit } from "@/lib/rate-limiter";
-import { createRequestSchema, listRequestsQuerySchema } from "@/lib/schemas/request.schema";
+import { apiCreateRequestSchema, listRequestsQuerySchema } from "@/lib/schemas/request.schema";
 
 // ─── GET /api/v1/purchase-requests ───────────────────────────────────────────
 
@@ -156,12 +156,15 @@ export async function POST(request: NextRequest) {
     const rawExternalId =
       typeof extBody.external_id === "string" && extBody.external_id.trim().length > 0
         ? extBody.external_id.trim()
+        : typeof extBody.externalId === "string" && extBody.externalId.trim().length > 0
+        ? extBody.externalId.trim()
         : (headerIdempotencyKey ? headerIdempotencyKey.trim() : null);
 
     const externalId = rawExternalId && rawExternalId.length > 0 ? rawExternalId : null;
 
     // 4. Validar campos requeridos con Zod (HU-21: 422 para errores de validación)
-    const parsed = createRequestSchema.safeParse(body);
+    // Se usa apiCreateRequestSchema que valida los campos e ignora de forma segura companyId si viene en el body (HU-20)
+    const parsed = apiCreateRequestSchema.safeParse(body);
     if (!parsed.success) {
       return apiError(
         422,
