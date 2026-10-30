@@ -1,10 +1,3 @@
-"use client";
-
-/**
- * HU-08: Editar una solicitud en estado DRAFT.
- * Carga los datos actuales y permite modificar título, descripción,
- * centro de costo e ítems. Los errores se muestran junto a cada campo.
- */
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -61,7 +54,6 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
   const [submitting, setSubmit]   = useState(false);
   const [serverError, setServerError] = useState("");
 
-  // Resolver params y cargar datos
   useEffect(() => {
     params.then(({ id }) => {
       setRequestId(id);
@@ -214,7 +206,7 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             {items.map((item, idx) => (
               <div key={item.id}>
-                {/* Desktop */}
+               
                 <div className="edit-desktop-row">
                   <div>
                     <input type="text" value={item.description} onChange={(e) => updateItem(item.id, "description", e.target.value)} placeholder="Descripción" style={inp(errors[`items.${idx}.description`])} maxLength={500} />
@@ -229,7 +221,7 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
                   <button type="button" onClick={() => removeItem(item.id)} disabled={items.length === 1} style={{ minWidth: "32px", minHeight: "32px", borderRadius: "6px", background: "transparent", border: "none", color: items.length === 1 ? "var(--border)" : "var(--muted)", cursor: items.length === 1 ? "default" : "pointer", fontSize: "16px" }}>×</button>
                 </div>
 
-                {/* Mobile Card */}
+            
                 <div className="edit-mobile-card">
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--brand-400)" }}>Producto #{idx + 1}</span>

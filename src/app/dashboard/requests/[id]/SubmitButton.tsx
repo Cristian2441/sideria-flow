@@ -1,9 +1,3 @@
-"use client";
-
-/**
- * HU-09: Botón para enviar una solicitud DRAFT a aprobación.
- * HU-26: Feedback visual con Toast y diálogo modal de confirmación.
- */
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -41,7 +35,6 @@ export default function SubmitButton({ requestId }: SubmitButtonProps) {
       setShowConfirmModal(false);
       showToast("Solicitud enviada a aprobación exitosamente.", "success");
 
-      // Recarga la página para reflejar el nuevo estado (PENDING_MANAGER)
       router.refresh();
     } catch {
       const connErr = "Error de conexión. Intenta de nuevo.";
@@ -79,7 +72,6 @@ export default function SubmitButton({ requestId }: SubmitButtonProps) {
         )}
       </div>
 
-      {/* Diálogo modal de confirmación antes de enviar */}
       {showConfirmModal && (
         <div
           role="dialog"
