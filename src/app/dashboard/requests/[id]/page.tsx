@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/session";
+import { db } from "@/prisma/db";
 import type { PurchaseRequestStatus, UserRole } from "@/lib/types";
 import { APPROVAL_THRESHOLD } from "@/lib/types";
 import ReviewForm from "./ReviewForm";
@@ -107,6 +108,12 @@ function formatDate(iso: string) {
   });
 }
 
+const PR_FIELDS = [
+  "id", "title", "description", "costCenter", "status",
+  "totalAmount", "source", "requesterId", "companyId",
+  "externalId", "createdAt", "updatedAt",
+] as const;
+
 export default async function RequestDetailPage({
   params,
 }: {
@@ -116,30 +123,70 @@ export default async function RequestDetailPage({
   if (!session) redirect("/login");
 
   const { id } = await params;
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const companyId = session.companyId;
 
-  const { cookies } = await import("next/headers");
-  const cookieStore = await cookies();
-  const cookieHeader = cookieStore
-    .getAll()
-    .map((c) => `${c.name}=${c.value}`)
-    .join("; ");
+  // Consulta directa a DB — sin fetch HTTP interno
+  const pr = await db.orm.public.PurchaseRequest
+    .where((r) => r.id.eq(id))
+    .where((r) => r.companyId.eq(companyId))
+    .select(...PR_FIELDS)
+    .first();
 
-  const res = await fetch(`${baseUrl}/api/purchase-requests/${id}`, {
-    headers: { Cookie: cookieHeader },
-    cache: "no-store",
+  if (!pr) notFound();
+
+  const [items, history, users] = await Promise.all([
+    db.orm.public.RequestItem
+      .where((i) => i.requestId.eq(id))
+      .where((i) => i.companyId.eq(companyId))
+      .select("id", "description", "quantity", "unitPrice", "createdAt")
+      .all(),
+    db.orm.public.ApprovalHistory
+      .where((h) => h.requestId.eq(id))
+      .where((h) => h.companyId.eq(companyId))
+      .select("id", "fromStatus", "toStatus", "comment", "actorId", "createdAt")
+      .all(),
+    db.orm.public.User
+      .where((u) => u.companyId.eq(companyId))
+      .select("id", "name", "email", "role")
+      .all(),
+  ]);
+
+  const userMap = new Map(users.map((u) => [u.id, u]));
+  history.sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
+
+  const historyWithActor: HistoryEntry[] = history.map((h) => {
+    const actorUser = userMap.get(h.actorId);
+    return {
+      ...h,
+      fromStatus: (h.fromStatus as PurchaseRequestStatus | null),
+      toStatus: h.toStatus as PurchaseRequestStatus,
+      actor: actorUser
+        ? { id: actorUser.id, name: actorUser.name, email: actorUser.email, role: actorUser.role }
+        : null,
+    };
   });
 
-  if (res.status === 404) notFound();
-  if (!res.ok) redirect("/dashboard/requests");
+  const requester = userMap.get(pr.requesterId) ?? null;
 
-  const { data: pr } = (await res.json()) as { data: RequestDetail };
+  const detail: RequestDetail = {
+    ...pr,
+    status: pr.status as PurchaseRequestStatus,
+    totalAmount: Number(pr.totalAmount),
+    requester,
+    items: items.map((i) => ({
+      id: i.id,
+      description: i.description,
+      quantity: Number(i.quantity),
+      unitPrice: Number(i.unitPrice),
+    })),
+    history: historyWithActor,
+  };
 
   const role = session.role as UserRole;
-  const canEdit = role === "REQUESTER" && pr.status === "DRAFT" && pr.requesterId === session.userId;
-  const canSubmit = role === "REQUESTER" && pr.status === "DRAFT" && pr.requesterId === session.userId;
-  const canReviewManager = role === "MANAGER" && pr.status === "PENDING_MANAGER" && pr.requesterId !== session.userId;
-  const canReviewFinance = role === "FINANCE" && pr.status === "PENDING_FINANCE" && pr.requesterId !== session.userId;
+  const canEdit = role === "REQUESTER" && detail.status === "DRAFT" && detail.requesterId === session.userId;
+  const canSubmit = role === "REQUESTER" && detail.status === "DRAFT" && detail.requesterId === session.userId;
+  const canReviewManager = role === "MANAGER" && detail.status === "PENDING_MANAGER" && detail.requesterId !== session.userId;
+  const canReviewFinance = role === "FINANCE" && detail.status === "PENDING_FINANCE" && detail.requesterId !== session.userId;
   const canReview = canReviewManager || canReviewFinance;
 
   return (
@@ -160,24 +207,24 @@ export default async function RequestDetailPage({
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-                {pr.title}
+                {detail.title}
               </h1>
-              <StatusBadge status={pr.status} />
+              <StatusBadge status={detail.status} />
             </div>
 
             <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
-              {pr.requester && (
+              {detail.requester && (
                 <span>
-                  Solicitante: <strong className="text-slate-700">{pr.requester.name}</strong>
+                  Solicitante: <strong className="text-slate-700">{detail.requester.name}</strong>
                 </span>
               )}
               <span>•</span>
               <span>
-                Centro de costo: <strong className="text-slate-700">{pr.costCenter}</strong>
+                Centro de costo: <strong className="text-slate-700">{detail.costCenter}</strong>
               </span>
               <span>•</span>
               <span>
-                Origen: <strong className="text-slate-700">{pr.source}</strong>
+                Origen: <strong className="text-slate-700">{detail.source}</strong>
               </span>
             </div>
           </div>
@@ -187,9 +234,9 @@ export default async function RequestDetailPage({
               Monto Total
             </span>
             <div className="text-3xl font-extrabold text-slate-900 mt-0.5">
-              {formatCLP(pr.totalAmount)}
+              {formatCLP(detail.totalAmount)}
             </div>
-            {pr.totalAmount > APPROVAL_THRESHOLD && (
+            {detail.totalAmount > APPROVAL_THRESHOLD && (
               <span className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
                 Requiere aprobación de Finanzas (&gt; $500.000)
               </span>
@@ -201,23 +248,23 @@ export default async function RequestDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
         <div className="lg:col-span-2 flex flex-col gap-6">
-        
+
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8">
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
               Descripción
             </h2>
             <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
-              {pr.description}
+              {detail.description}
             </p>
           </section>
 
           <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                Productos ({pr.items.length})
+                Productos ({detail.items.length})
               </h2>
               <span className="text-xs font-semibold text-slate-500">
-                Total: {formatCLP(pr.totalAmount)}
+                Total: {formatCLP(detail.totalAmount)}
               </span>
             </div>
 
@@ -232,7 +279,7 @@ export default async function RequestDetailPage({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {pr.items.map((item) => (
+                  {detail.items.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="py-3.5 pr-4 text-xs font-medium text-slate-800">
                         {item.description}
@@ -255,7 +302,7 @@ export default async function RequestDetailPage({
                       Total estimado
                     </td>
                     <td className="pt-4 pl-4 text-right text-base font-extrabold text-slate-900">
-                      {formatCLP(pr.totalAmount)}
+                      {formatCLP(detail.totalAmount)}
                     </td>
                   </tr>
                 </tfoot>
@@ -263,7 +310,7 @@ export default async function RequestDetailPage({
             </div>
           </section>
 
-          {canReview && <ReviewForm requestId={pr.id} />}
+          {canReview && <ReviewForm requestId={detail.id} />}
 
           {canSubmit && (
             <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col gap-4">
@@ -279,13 +326,13 @@ export default async function RequestDetailPage({
               <div className="flex items-center gap-3 flex-wrap pt-2 border-t border-slate-100">
                 {canEdit && (
                   <Link
-                    href={`/dashboard/requests/${pr.id}/edit`}
+                    href={`/dashboard/requests/${detail.id}/edit`}
                     className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all inline-flex items-center gap-1.5"
                   >
                     ✏️ Editar solicitud
                   </Link>
                 )}
-                <SubmitButton requestId={pr.id} />
+                <SubmitButton requestId={detail.id} />
               </div>
             </section>
           )}
@@ -297,12 +344,12 @@ export default async function RequestDetailPage({
               Historial de la solicitud
             </h2>
 
-            {pr.history.length === 0 ? (
+            {detail.history.length === 0 ? (
               <p className="text-xs text-slate-400">Sin historial registrado.</p>
             ) : (
               <div className="flex flex-col">
-                {pr.history.map((entry, idx) => {
-                  const isLast = idx === pr.history.length - 1;
+                {detail.history.map((entry, idx) => {
+                  const isLast = idx === detail.history.length - 1;
                   const cfg = STATUS_CONFIG[entry.toStatus];
                   return (
                     <div key={entry.id} className="flex gap-3">
@@ -350,9 +397,9 @@ export default async function RequestDetailPage({
             )}
 
             <div className="pt-4 border-t border-slate-100 flex flex-col gap-2 text-xs">
-              {pr.requester && <MetaRow label="Solicitante" value={pr.requester.name} />}
-              <MetaRow label="Creada" value={formatDate(pr.createdAt)} />
-              <MetaRow label="Actualizada" value={formatDate(pr.updatedAt)} />
+              {detail.requester && <MetaRow label="Solicitante" value={detail.requester.name} />}
+              <MetaRow label="Creada" value={formatDate(detail.createdAt)} />
+              <MetaRow label="Actualizada" value={formatDate(detail.updatedAt)} />
             </div>
           </section>
         </aside>

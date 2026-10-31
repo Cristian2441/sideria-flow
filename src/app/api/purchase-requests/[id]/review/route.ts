@@ -10,6 +10,7 @@ import {
 } from "@/lib/business-rules";
 import { APPROVAL_THRESHOLD } from "@/lib/types";
 import type { PurchaseRequestStatus, UserRole } from "@/lib/types";
+import { sendApprovalWebhook } from "@/lib/webhook";
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -111,6 +112,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       "externalId", "createdAt", "updatedAt"
     )
     .first();
+
+  if (newStatus === "APPROVED" && finalRequest) {
+    void sendApprovalWebhook(
+      {
+        id: finalRequest.id,
+        title: finalRequest.title,
+        totalAmount: finalRequest.totalAmount,
+        costCenter: finalRequest.costCenter,
+        companyId: finalRequest.companyId,
+      },
+      { id: session.userId, name: session.name, role }
+    );
+  }
 
   return apiSuccess({
     data: finalRequest,

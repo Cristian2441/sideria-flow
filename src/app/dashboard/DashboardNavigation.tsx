@@ -95,6 +95,24 @@ export default function DashboardNavigation({
       ),
       isActive: pathname.startsWith("/dashboard/pending"),
     });
+
+    navItems.push({
+      href: "/dashboard/indicators",
+      label: "Indicadores",
+      icon: (
+        <svg
+          width="20"
+          height="20"
+          style={{ width: 20, height: 20, minWidth: 20, minHeight: 20, flexShrink: 0 }}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+      isActive: pathname.startsWith("/dashboard/indicators"),
+    });
   }
 
   const newRequestActive = pathname === "/dashboard/requests/new";
@@ -189,12 +207,13 @@ export default function DashboardNavigation({
                 </div>
               </div>
             </div>
-            <a
-              href="/api/auth/logout"
-              className="flex items-center gap-2 text-xs text-slate-400 hover:text-white"
+            <button
+              type="button"
+              onClick={() => { window.location.href = "/api/auth/logout"; }}
+              className="flex items-center gap-2 text-xs text-slate-400 hover:text-white cursor-pointer"
             >
               Cerrar sesión
-            </a>
+            </button>
           </div>
         </div>
       )}
@@ -331,9 +350,10 @@ export default function DashboardNavigation({
             </div>
           </div>
 
-          <a
-            href="/api/auth/logout"
-            className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1.5 rounded-lg hover:bg-slate-800/30 text-decoration-none"
+          <button
+            type="button"
+            onClick={() => { window.location.href = "/api/auth/logout"; }}
+            className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition-colors px-2 py-1.5 rounded-lg hover:bg-slate-800/30 text-decoration-none w-full text-left cursor-pointer"
           >
             <svg
               width="16"
@@ -346,7 +366,7 @@ export default function DashboardNavigation({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             <span>Cerrar sesión</span>
-          </a>
+          </button>
         </div>
       </aside>
     </>
