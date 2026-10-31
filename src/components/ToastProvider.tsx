@@ -1,9 +1,5 @@
 "use client";
 
-/**
- * Sistema de notificaciones Toast para HU-26.
- * Proporciona feedback visual inmediato tras cada acción de usuario.
- */
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 
@@ -24,7 +20,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) {
-    // Si se llama fuera del provider, provee un fallback seguro
+
     return {
       showToast: (message: string) => {
         console.log("[Toast fallback]:", message);
@@ -37,8 +33,8 @@ export function useToast() {
 const TOAST_ICONS: Record<ToastType, string> = {
   success: "✓",
   error: "✕",
-  warning: "⚠️",
-  info: "ℹ️",
+  warning: "",
+  info: "",
 };
 
 const TOAST_COLORS: Record<ToastType, { border: string; bg: string; text: string; iconBg: string }> = {
@@ -79,13 +75,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const id = crypto.randomUUID();
     setToasts((prev) => [...prev, { id, message, type }]);
 
-    // Auto-desaparecer en 4 segundos
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
   }, []);
 
-  // También verifica si hay algún toast pendiente guardado en sessionStorage (útil tras redirects)
   useEffect(() => {
     try {
       const pending = sessionStorage.getItem("sf_pending_toast");
@@ -97,7 +91,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         }, 0);
       }
     } catch {
-      // Ignorar si sessionStorage no está disponible
+
     }
   }, [showToast]);
 
@@ -105,7 +99,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={{ showToast }}>
       {children}
 
-      {/* Contenedor flotante de Toasts */}
       <div
         aria-live="polite"
         style={{
@@ -193,15 +186,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-/**
- * Función auxiliar para encolar un Toast que debe mostrarse tras una navegación/redirección.
- */
+
 export function setPendingToast(message: string, type: ToastType = "success") {
   if (typeof window !== "undefined") {
     try {
       sessionStorage.setItem("sf_pending_toast", JSON.stringify({ message, type }));
     } catch {
-      // Ignorar si sessionStorage no está disponible
+
     }
   }
 }

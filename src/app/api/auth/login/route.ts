@@ -61,10 +61,13 @@ export async function POST(request: Request) {
       console.error("Rate limiter unavailable:", err);
     }
   } else {
-    // Modo local / desarrollo: limitador en memoria (15 minutos)
+    // Modo local / desarrollo: límites más altos para no bloquear durante testing
+    const isDev = process.env.NODE_ENV !== "production";
     const WINDOW_15M = 15 * 60 * 1000;
-    const accountCheck = checkRateLimit(`login:${ip}:${email}`, 5, WINDOW_15M);
-    const ipCheck = checkRateLimit(`login-ip:${ip}`, 20, WINDOW_15M);
+    const accountLimit = isDev ? 30 : 5;
+    const ipLimit = isDev ? 100 : 20;
+    const accountCheck = checkRateLimit(`login:${ip}:${email}`, accountLimit, WINDOW_15M);
+    const ipCheck = checkRateLimit(`login-ip:${ip}`, ipLimit, WINDOW_15M);
 
     if (!accountCheck.allowed || !ipCheck.allowed) {
       return apiError(429, "TOO_MANY_ATTEMPTS", "Demasiados intentos. Intenta más tarde.");
