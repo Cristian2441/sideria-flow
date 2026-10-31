@@ -19,8 +19,12 @@ export async function GET(request: NextRequest) {
     search:     searchParams.get("search")     ?? undefined,
     status:     searchParams.get("status")     ?? undefined,
     costCenter: searchParams.get("costCenter") ?? undefined,
+    amount:     searchParams.get("amount")     ?? undefined,
     minAmount:  searchParams.get("minAmount")  ?? undefined,
     maxAmount:  searchParams.get("maxAmount")  ?? undefined,
+    date:       searchParams.get("date")       ?? undefined,
+    dateFrom:   searchParams.get("dateFrom")   ?? undefined,
+    dateTo:     searchParams.get("dateTo")     ?? undefined,
     page:       searchParams.get("page")       ?? undefined,
     pageSize:   searchParams.get("pageSize")   ?? undefined,
   });
@@ -31,7 +35,7 @@ export async function GET(request: NextRequest) {
     ]);
   }
 
-  const { search, status, costCenter, minAmount, maxAmount, page, pageSize } = parsed.data;
+  const { search, status, costCenter, amount, minAmount, maxAmount, date, dateFrom, dateTo, page, pageSize } = parsed.data;
 
   let query = db.orm.public.PurchaseRequest
     .where((r) => r.companyId.eq(companyId));
@@ -40,10 +44,11 @@ export async function GET(request: NextRequest) {
     query = query.where((r) => r.requesterId.eq(session.userId));
   }
 
-  if (status)     query = query.where((r) => r.status.eq(status));
-  if (costCenter) query = query.where((r) => r.costCenter.eq(costCenter));
+  if (status) query = query.where((r) => r.status.eq(status));
+
+  const effectiveMax = maxAmount !== undefined ? maxAmount : amount;
   if (minAmount !== undefined) query = query.where((r) => r.totalAmount.gte(minAmount));
-  if (maxAmount !== undefined) query = query.where((r) => r.totalAmount.lte(maxAmount));
+  if (effectiveMax !== undefined) query = query.where((r) => r.totalAmount.lte(effectiveMax));
 
   let allItems = await query
     .select(
@@ -60,6 +65,30 @@ export async function GET(request: NextRequest) {
         item.title.toLowerCase().includes(q) ||
         (item.description && item.description.toLowerCase().includes(q))
     );
+  }
+
+  if (costCenter) {
+    const cc = costCenter.trim().toLowerCase();
+    allItems = allItems.filter((item) => item.costCenter.trim().toLowerCase() === cc);
+  }
+
+  if (date) {
+    allItems = allItems.filter((item) => {
+      const d = new Date(item.createdAt);
+      const isoDay = d.toISOString().slice(0, 10);
+      const localDay = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return isoDay === date || localDay === date;
+    });
+  }
+
+  if (dateFrom) {
+    const fromTime = new Date(`${dateFrom}T00:00:00`).getTime();
+    allItems = allItems.filter((item) => new Date(item.createdAt).getTime() >= fromTime);
+  }
+
+  if (dateTo) {
+    const toTime = new Date(`${dateTo}T23:59:59.999`).getTime();
+    allItems = allItems.filter((item) => new Date(item.createdAt).getTime() <= toTime);
   }
 
   allItems.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));

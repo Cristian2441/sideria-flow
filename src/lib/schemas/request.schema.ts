@@ -2,8 +2,8 @@ import { z } from "zod";
 
 const MAX_QUANTITY = 100_000;
 const MAX_UNIT_PRICE = 100_000_000;
-const MAX_TOTAL_CLP = 1_000_000_000_000; 
- 
+const MAX_TOTAL_CLP = 1_000_000_000_000;
+
 export const REQUEST_STATUSES = [
   "DRAFT",
   "PENDING_MANAGER",
@@ -57,7 +57,7 @@ const requestBase = z.object({
   items: itemsArray,
 });
 
-export const createRequestSchema = requestBase.strict(); 
+export const createRequestSchema = requestBase.strict();
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
 export const updateRequestSchema = requestBase
   .partial()
@@ -71,9 +71,12 @@ export const listRequestsQuerySchema = z
     search: z.string().trim().max(200).optional(),
     status: z.enum(REQUEST_STATUSES).optional(),
     costCenter: z.string().trim().max(100).optional(),
+    amount: z.coerce.number().int().min(0).max(MAX_TOTAL_CLP).optional(),
     minAmount: z.coerce.number().int().min(0).max(MAX_TOTAL_CLP).optional(),
     maxAmount: z.coerce.number().int().min(0).max(MAX_TOTAL_CLP).optional(),
-    // Paginación por cursor (recomendada). `page` queda solo por compatibilidad.
+    date: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido (YYYY-MM-DD)").optional(),
+    dateFrom: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido (YYYY-MM-DD)").optional(),
+    dateTo: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido (YYYY-MM-DD)").optional(),
     cursor: z.string().trim().max(200).optional(),
     page: z.coerce.number().int().min(1).max(1000).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(20),
@@ -84,8 +87,7 @@ export const listRequestsQuerySchema = z
     { message: "minAmount no puede ser mayor que maxAmount", path: ["minAmount"] }
   );
 export type ListRequestsQuery = z.infer<typeof listRequestsQuerySchema>;
- 
-/* ---------- Revisión ---------- */
+
 export const reviewRequestSchema = z
   .object({
     action: z.enum(["APPROVE", "REJECT"]),
@@ -97,8 +99,7 @@ export const reviewRequestSchema = z
     path: ["comment"],
   });
 export type ReviewRequestInput = z.infer<typeof reviewRequestSchema>;
- 
-/* ---------- Ingesta por API (externalId / payloadHash con límites) ---------- */
+
 export const apiCreateRequestSchema = requestBase
   .extend({
     companyId: z.string().optional(),

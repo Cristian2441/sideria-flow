@@ -92,7 +92,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       if (pending) {
         sessionStorage.removeItem("sf_pending_toast");
         const parsed = JSON.parse(pending) as { message: string; type: ToastType };
-        showToast(parsed.message, parsed.type);
+        setTimeout(() => {
+          showToast(parsed.message, parsed.type);
+        }, 0);
       }
     } catch {
       // Ignorar si sessionStorage no está disponible

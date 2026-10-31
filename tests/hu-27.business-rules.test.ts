@@ -1,15 +1,3 @@
-/**
- * Tests HU-27: Reglas de negocio del flujo de aprobación
- *
- * Verifica en la BD real (Supabase) que:
- * 1. Solicitudes ≤ 500.000 CLP se aprueban directamente por MANAGER (APPROVED)
- * 2. Solicitudes > 500.000 CLP se derivan a PENDING_FINANCE
- * 3. No se puede aprobar la propia solicitud (no self-approval → 403)
- * 4. Rechazar requiere comentario obligatorio
- * 5. Los triggers de BD impiden transiciones de estado inválidas
- * 6. No se pueden editar solicitudes fuera de DRAFT
- */
-
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { db } from "@/prisma/db";
 import {
@@ -19,21 +7,24 @@ import {
 } from "@/lib/guards";
 import { reviewRequestSchema } from "@/lib/schemas/request.schema";
 import { APPROVAL_THRESHOLD } from "@/lib/types";
+import {
+  determineApprovedStatus,
+  isSelfApproval,
+  canReviewInStatus,
+  isValidRejectionComment,
+} from "@/lib/business-rules";
 import type { JWTPayload } from "@/lib/auth";
 import crypto from "crypto";
-
-// ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 let companyId: string;
 let sessionRequester: JWTPayload;
 let sessionManager: JWTPayload;
 let sessionFinance: JWTPayload;
 
-// IDs de solicitudes creadas durante el test (para limpieza)
 const createdRequestIds: string[] = [];
 
 beforeAll(async () => {
-  // Cargar empresa Alpha y sus usuarios
+ 
   const company = await db.orm.public.Company
     .where((c) => c.name.eq("Empresa Alpha"))
     .select("id")
@@ -51,25 +42,23 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Limpiar solicitudes creadas durante los tests
+ 
   if (createdRequestIds.length > 0) {
     for (const id of createdRequestIds) {
       try {
         await db.orm.public.ApprovalHistory.where((h) => h.requestId.eq(id)).deleteAll();
         await db.orm.public.RequestItem.where((i) => i.requestId.eq(id)).deleteAll();
         await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).deleteAll();
-      } catch { /* ya fue eliminada o no existe */ }
+      } catch {}
     }
   }
 });
 
-// ─── Helper: crear solicitud de prueba ───────────────────────────────────────
 
 async function createTestRequest(totalAmount: number): Promise<string> {
   const id = crypto.randomUUID();
   createdRequestIds.push(id);
 
-  // Crear solicitud en DRAFT
   await db.orm.public.PurchaseRequest.create({
     id,
     companyId,
@@ -82,7 +71,6 @@ async function createTestRequest(totalAmount: number): Promise<string> {
     payloadHash: null,
   });
 
-  // Insertar ítem con el monto deseado (el trigger calculará totalAmount)
   await db.orm.public.RequestItem.create({
     id: crypto.randomUUID(),
     requestId: id,
@@ -95,8 +83,6 @@ async function createTestRequest(totalAmount: number): Promise<string> {
   return id;
 }
 
-// ─── 1. Umbral de aprobación (RN-05) ─────────────────────────────────────────
-
 describe("HU-27 — Umbral de aprobación 500.000 CLP", () => {
   it("APPROVAL_THRESHOLD es exactamente 500.000", () => {
     expect(APPROVAL_THRESHOLD).toBe(500_000);
@@ -105,15 +91,12 @@ describe("HU-27 — Umbral de aprobación 500.000 CLP", () => {
   it("solicitud de 500.000 CLP exactos → MANAGER aprueba directamente (APPROVED)", async () => {
     const id = await createTestRequest(500_000);
 
-    // Enviar a jefatura
     await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "PENDING_MANAGER" });
     await db.orm.public.ApprovalHistory.create({ id: crypto.randomUUID(), requestId: id, companyId, actorId: sessionRequester.userId, fromStatus: "DRAFT", toStatus: "PENDING_MANAGER", comment: null });
 
-    // Leer total (calculado por trigger)
     const pr = await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).select("totalAmount", "status").first();
     expect(pr!.totalAmount).toBe(500_000);
 
-    // Verificar lógica del route handler (sin hacer HTTP)
     const newStatus = pr!.totalAmount > APPROVAL_THRESHOLD ? "PENDING_FINANCE" : "APPROVED";
     expect(newStatus).toBe("APPROVED");
   });
@@ -148,8 +131,6 @@ describe("HU-27 — Umbral de aprobación 500.000 CLP", () => {
   });
 });
 
-// ─── 2. No self-approval (RN-07) ─────────────────────────────────────────────
-
 describe("HU-27 — No self-approval (el creador no puede aprobar su propia solicitud)", () => {
   it("el solicitante NO puede aprobar con roleGuard → 403", async () => {
     const g = await permissionGuard(sessionRequester, "REVIEW_FIRST_STAGE");
@@ -158,30 +139,24 @@ describe("HU-27 — No self-approval (el creador no puede aprobar su propia soli
   });
 
   it("MANAGER puede aprobar una solicitud que NO creó", async () => {
-    // El requesterId del fixture es sessionRequester.userId, no sessionManager.userId
+
     const id = await createTestRequest(100_000);
     await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "PENDING_MANAGER" });
 
     const pr = await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).select("requesterId").first();
 
-    // MANAGER no es el creador → puede aprobar
     expect(pr!.requesterId).toBe(sessionRequester.userId);
     expect(pr!.requesterId).not.toBe(sessionManager.userId);
-    // La lógica de no-self-approval pasa
     expect(true).toBe(true);
   });
 
   it("si requesterId === actorId → el guard de negocio bloquea (simulado)", async () => {
-    // Simula que el MANAGER intentara aprobar una solicitud que él mismo creó
-    // (esto se valida en el route handler, no en el DB trigger guard_history_insert)
     const fakeRequesterId = sessionManager.userId;
     const actorId = sessionManager.userId;
     const isSelfApproval = fakeRequesterId === actorId;
-    expect(isSelfApproval).toBe(true); // la validación en el route handler lo detecta
+    expect(isSelfApproval).toBe(true); 
   });
 });
-
-// ─── 3. Rechazo requiere comentario (RN-06) ───────────────────────────────────
 
 describe("HU-27 — Rechazo requiere comentario obligatorio", () => {
   it("REJECT sin comentario → Zod rechaza la validación", () => {
@@ -217,14 +192,12 @@ describe("HU-27 — Rechazo requiere comentario obligatorio", () => {
   });
 });
 
-// ─── 4. Trigger BD: solicitud sin ítems no puede ir a PENDING_MANAGER ────────
 
 describe("HU-27 — Trigger BD: solicitud sin ítems no puede enviarse", () => {
   it("la BD rechaza la transición DRAFT → PENDING_MANAGER si no hay ítems", async () => {
     const id = crypto.randomUUID();
     createdRequestIds.push(id);
 
-    // Crear solicitud sin ítems
     await db.orm.public.PurchaseRequest.create({
       id, companyId,
       requesterId: sessionRequester.userId,
@@ -236,14 +209,11 @@ describe("HU-27 — Trigger BD: solicitud sin ítems no puede enviarse", () => {
       payloadHash: null,
     });
 
-    // Intentar transición → el trigger guard_request_update debe lanzar error
     await expect(
       db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "PENDING_MANAGER" })
-    ).rejects.toThrow(); // "No se puede enviar una solicitud sin productos"
+    ).rejects.toThrow(); 
   });
 });
-
-// ─── 5. Trigger BD: solicitudes sobre 500k no pasan directamente a APPROVED ──
 
 describe("HU-27 — Trigger BD: transiciones de estado inválidas son rechazadas", () => {
   it("PENDING_MANAGER → APPROVED con totalAmount > 500k lanza error en BD", async () => {
@@ -252,10 +222,9 @@ describe("HU-27 — Trigger BD: transiciones de estado inválidas son rechazadas
     await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "PENDING_MANAGER" });
     await db.orm.public.ApprovalHistory.create({ id: crypto.randomUUID(), requestId: id, companyId, actorId: sessionRequester.userId, fromStatus: "DRAFT", toStatus: "PENDING_MANAGER", comment: null });
 
-    // El trigger guard_request_update debe rechazar esta transición
     await expect(
       db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "APPROVED" })
-    ).rejects.toThrow(); // "Solicitudes sobre 500000 requieren aprobación de finanzas"
+    ).rejects.toThrow(); 
   });
 
   it("PENDING_MANAGER → PENDING_FINANCE con totalAmount ≤ 500k lanza error en BD", async () => {
@@ -264,10 +233,9 @@ describe("HU-27 — Trigger BD: transiciones de estado inválidas son rechazadas
     await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "PENDING_MANAGER" });
     await db.orm.public.ApprovalHistory.create({ id: crypto.randomUUID(), requestId: id, companyId, actorId: sessionRequester.userId, fromStatus: "DRAFT", toStatus: "PENDING_MANAGER", comment: null });
 
-    // El trigger guard_request_update debe rechazar esta transición
     await expect(
       db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "PENDING_FINANCE" })
-    ).rejects.toThrow(); // "Solicitudes de hasta 500000 no requieren aprobación de finanzas"
+    ).rejects.toThrow(); 
   });
 
   it("APPROVED → cualquier estado lanza error en BD (estado final)", async () => {
@@ -277,11 +245,9 @@ describe("HU-27 — Trigger BD: transiciones de estado inválidas son rechazadas
 
     await expect(
       db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "DRAFT" })
-    ).rejects.toThrow(); // transición no permitida
+    ).rejects.toThrow();
   });
 });
-
-// ─── 6. Solo se puede editar en DRAFT ────────────────────────────────────────
 
 describe("HU-27 — Solo se pueden editar solicitudes en DRAFT", () => {
   it("editar contenido en PENDING_MANAGER lanza error en BD", async () => {
@@ -290,26 +256,61 @@ describe("HU-27 — Solo se pueden editar solicitudes en DRAFT", () => {
     await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ status: "PENDING_MANAGER" });
     await db.orm.public.ApprovalHistory.create({ id: crypto.randomUUID(), requestId: id, companyId, actorId: sessionRequester.userId, fromStatus: "DRAFT", toStatus: "PENDING_MANAGER", comment: null });
 
-    // El trigger guard_request_update bloquea cambios de título/descripción/costCenter en !DRAFT
     await expect(
       db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).update({ title: "Nuevo título" })
-    ).rejects.toThrow(); // "Solo se pueden editar solicitudes en estado DRAFT"
+    ).rejects.toThrow(); 
   });
 });
 
-// ─── 7. trigger sync_request_total_amount ────────────────────────────────────
-
 describe("HU-27 — Trigger BD: total_amount se calcula automáticamente", () => {
   it("el trigger calcula total_amount correctamente al insertar ítems", async () => {
-    const id = await createTestRequest(0); // unitPrice=0, no cuenta
+    const id = await createTestRequest(0); 
 
-    // Agregar ítems adicionales
     await db.orm.public.RequestItem.create({ id: crypto.randomUUID(), requestId: id, companyId, description: "A", quantity: 3, unitPrice: 100_000 });
     await db.orm.public.RequestItem.create({ id: crypto.randomUUID(), requestId: id, companyId, description: "B", quantity: 2, unitPrice: 50_000 });
 
     const pr = await db.orm.public.PurchaseRequest.where((r) => r.id.eq(id)).select("totalAmount").first();
-    // 1×0 + 3×100.000 + 2×50.000 = 400.000
     expect(pr!.totalAmount).toBe(400_000);
   });
 });
+
+
+describe("HU-27 — Reglas implementadas como funciones puras", () => {
+  it("determineApprovedStatus: MANAGER aprueba directamente si monto <= 500.000", () => {
+    expect(determineApprovedStatus("MANAGER", 500_000)).toBe("APPROVED");
+    expect(determineApprovedStatus("MANAGER", 499_999)).toBe("APPROVED");
+    expect(determineApprovedStatus("MANAGER", 1)).toBe("APPROVED");
+  });
+
+  it("determineApprovedStatus: MANAGER deriva a PENDING_FINANCE si monto > 500.000", () => {
+    expect(determineApprovedStatus("MANAGER", 500_001)).toBe("PENDING_FINANCE");
+    expect(determineApprovedStatus("MANAGER", 1_000_000)).toBe("PENDING_FINANCE");
+  });
+
+  it("determineApprovedStatus: FINANCE siempre aprueba (APPROVED)", () => {
+    expect(determineApprovedStatus("FINANCE", 5_000_000)).toBe("APPROVED");
+  });
+
+  it("isSelfApproval: detecta si el actor es el mismo solicitante", () => {
+    expect(isSelfApproval("usr-123", "usr-123")).toBe(true);
+    expect(isSelfApproval("usr-123", "usr-456")).toBe(false);
+  });
+
+  it("canReviewInStatus: valida roles y estados correspondientes", () => {
+    expect(canReviewInStatus("MANAGER", "PENDING_MANAGER")).toBe(true);
+    expect(canReviewInStatus("MANAGER", "PENDING_FINANCE")).toBe(false);
+    expect(canReviewInStatus("FINANCE", "PENDING_FINANCE")).toBe(true);
+    expect(canReviewInStatus("FINANCE", "PENDING_MANAGER")).toBe(false);
+    expect(canReviewInStatus("REQUESTER", "PENDING_MANAGER")).toBe(false);
+  });
+
+  it("isValidRejectionComment: rechaza comentarios vacíos o con solo espacios", () => {
+    expect(isValidRejectionComment("")).toBe(false);
+    expect(isValidRejectionComment("   ")).toBe(false);
+    expect(isValidRejectionComment(null)).toBe(false);
+    expect(isValidRejectionComment(undefined)).toBe(false);
+    expect(isValidRejectionComment("Presupuesto insuficiente")).toBe(true);
+  });
+});
+
 

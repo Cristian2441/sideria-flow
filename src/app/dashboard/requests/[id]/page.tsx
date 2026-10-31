@@ -6,7 +6,6 @@ import { APPROVAL_THRESHOLD } from "@/lib/types";
 import ReviewForm from "./ReviewForm";
 import SubmitButton from "./SubmitButton";
 
-
 interface RequestItem {
   id: string;
   description: string;
@@ -48,33 +47,47 @@ interface RequestDetail {
   history: HistoryEntry[];
 }
 
-
-const STATUS_CONFIG: Record<PurchaseRequestStatus, { label: string; color: string; bg: string }> = {
-  DRAFT:           { label: "Borrador",     color: "#a1a1aa", bg: "rgba(161,161,170,0.12)" },
-  PENDING_MANAGER: { label: "En jefatura",  color: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
-  PENDING_FINANCE: { label: "En finanzas",  color: "#06b6d4", bg: "rgba(6,182,212,0.12)"  },
-  APPROVED:        { label: "Aprobada",     color: "#22c55e", bg: "rgba(34,197,94,0.12)"  },
-  REJECTED:        { label: "Rechazada",    color: "#ef4444", bg: "rgba(239,68,68,0.12)"  },
+const STATUS_CONFIG: Record<PurchaseRequestStatus, { label: string; badgeClass: string; dotClass: string }> = {
+  DRAFT: {
+    label: "Borrador",
+    badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
+    dotClass: "bg-slate-400",
+  },
+  PENDING_MANAGER: {
+    label: "En jefatura",
+    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+    dotClass: "bg-amber-500",
+  },
+  PENDING_FINANCE: {
+    label: "En finanzas",
+    badgeClass: "bg-cyan-50 text-cyan-700 border-cyan-200",
+    dotClass: "bg-cyan-500",
+  },
+  APPROVED: {
+    label: "Aprobada",
+    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    dotClass: "bg-emerald-500",
+  },
+  REJECTED: {
+    label: "Rechazada",
+    badgeClass: "bg-red-50 text-red-700 border-red-200",
+    dotClass: "bg-red-500",
+  },
 };
 
 const HISTORY_LABEL: Record<PurchaseRequestStatus, string> = {
-  DRAFT:           "Creada como borrador",
+  DRAFT: "Creada como borrador",
   PENDING_MANAGER: "Enviada a jefatura",
   PENDING_FINANCE: "Derivada a finanzas",
-  APPROVED:        "Aprobada",
-  REJECTED:        "Rechazada",
+  APPROVED: "Aprobada",
+  REJECTED: "Rechazada",
 };
 
 function StatusBadge({ status }: { status: PurchaseRequestStatus }) {
   const cfg = STATUS_CONFIG[status];
   return (
-    <span style={{
-      display: "inline-flex", alignItems: "center",
-      padding: "3px 12px", borderRadius: "999px",
-      fontSize: "12px", fontWeight: "600",
-      color: cfg.color, background: cfg.bg,
-      border: `1px solid ${cfg.color}33`,
-    }}>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${cfg.badgeClass}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dotClass}`} />
       {cfg.label}
     </span>
   );
@@ -86,8 +99,11 @@ function formatCLP(n: number) {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("es-CL", {
-    day: "2-digit", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -100,12 +116,14 @@ export default async function RequestDetailPage({
   if (!session) redirect("/login");
 
   const { id } = await params;
-  const role = session.role as UserRole;
-
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
   const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
-  const cookieHeader = cookieStore.getAll().map((c) => `${c.name}=${c.value}`).join("; ");
+  const cookieHeader = cookieStore
+    .getAll()
+    .map((c) => `${c.name}=${c.value}`)
+    .join("; ");
 
   const res = await fetch(`${baseUrl}/api/purchase-requests/${id}`, {
     headers: { Cookie: cookieHeader },
@@ -117,132 +135,154 @@ export default async function RequestDetailPage({
 
   const { data: pr } = (await res.json()) as { data: RequestDetail };
 
-  const canEdit   = role === "REQUESTER" && pr.status === "DRAFT" && pr.requesterId === session.userId;
+  const role = session.role as UserRole;
+  const canEdit = role === "REQUESTER" && pr.status === "DRAFT" && pr.requesterId === session.userId;
   const canSubmit = role === "REQUESTER" && pr.status === "DRAFT" && pr.requesterId === session.userId;
   const canReviewManager = role === "MANAGER" && pr.status === "PENDING_MANAGER" && pr.requesterId !== session.userId;
   const canReviewFinance = role === "FINANCE" && pr.status === "PENDING_FINANCE" && pr.requesterId !== session.userId;
   const canReview = canReviewManager || canReviewFinance;
 
   return (
-    <div className="detail-page-container">
-      <Link href="/dashboard/requests" style={{ fontSize: "12px", color: "var(--muted)", textDecoration: "none" }}>
-        ← Volver a solicitudes
-      </Link>
+    <div className="w-full max-w-[1240px] mx-auto flex flex-col gap-6">
 
-      <style>{`
-        .detail-page-container {
-          padding: 32px;
-          max-width: 860px;
-          width: 100%;
-          box-sizing: border-box;
-        }
-        .detail-grid {
-          display: grid;
-          grid-template-columns: 1fr 320px;
-          gap: 20px;
-          align-items: start;
-        }
-        @media (max-width: 768px) {
-          .detail-page-container {
-            padding: 16px 12px;
-          }
-          .detail-grid {
-            grid-template-columns: 1fr;
-          }
-        }
-      `}</style>
+      <div className="flex flex-col gap-3">
+        <Link
+          href="/dashboard/requests"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors w-fit font-medium"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Volver a solicitudes
+        </Link>
 
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginTop: "16px", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
-        <div>
-          <h1 style={{ fontSize: "20px", fontWeight: "700", margin: 0, marginBottom: "8px" }}>
-            {pr.title}
-          </h1>
-          <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-            <StatusBadge status={pr.status} />
-            {pr.requester && (
-              <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-                Solicitante: <strong style={{ color: "var(--neutral-300)" }}>{pr.requester.name}</strong>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                {pr.title}
+              </h1>
+              <StatusBadge status={pr.status} />
+            </div>
+
+            <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
+              {pr.requester && (
+                <span>
+                  Solicitante: <strong className="text-slate-700">{pr.requester.name}</strong>
+                </span>
+              )}
+              <span>•</span>
+              <span>
+                Centro de costo: <strong className="text-slate-700">{pr.costCenter}</strong>
+              </span>
+              <span>•</span>
+              <span>
+                Origen: <strong className="text-slate-700">{pr.source}</strong>
+              </span>
+            </div>
+          </div>
+
+          <div className="md:text-right flex flex-col items-start md:items-end">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              Monto Total
+            </span>
+            <div className="text-3xl font-extrabold text-slate-900 mt-0.5">
+              {formatCLP(pr.totalAmount)}
+            </div>
+            {pr.totalAmount > APPROVAL_THRESHOLD && (
+              <span className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                Requiere aprobación de Finanzas (&gt; $500.000)
               </span>
             )}
-            <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-              Centro de costo: <strong style={{ color: "var(--neutral-300)" }}>{pr.costCenter}</strong>
-            </span>
-            <span style={{ fontSize: "12px", color: "var(--muted)" }}>
-              Vía: <strong style={{ color: "var(--neutral-300)" }}>{pr.source}</strong>
-            </span>
           </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "24px", fontWeight: "800" }}>{formatCLP(pr.totalAmount)}</div>
-          {pr.totalAmount > APPROVAL_THRESHOLD && (
-            <div style={{ fontSize: "11px", color: "var(--brand-400)", marginTop: "2px" }}>
-              ↑ Requiere aprobación de Finanzas
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="detail-grid">
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-          <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px" }}>
-            <h2 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "10px" }}>
+        <div className="lg:col-span-2 flex flex-col gap-6">
+        
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
               Descripción
             </h2>
-            <p style={{ fontSize: "13px", lineHeight: "1.6", color: "var(--neutral-200)", margin: 0 }}>
+            <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
               {pr.description}
             </p>
           </section>
 
-          <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px" }}>
-            <h2 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px" }}>
-              Productos ({pr.items.length})
-            </h2>
-            <div style={{ overflowX: "auto", width: "100%", WebkitOverflowScrolling: "touch" }}>
-              <table style={{ width: "100%", minWidth: "300px", borderCollapse: "collapse" }}>
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                Productos ({pr.items.length})
+              </h2>
+              <span className="text-xs font-semibold text-slate-500">
+                Total: {formatCLP(pr.totalAmount)}
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
                 <thead>
-                  <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Descripción", "Cant.", "Precio unit.", "Subtotal"].map((h) => (
-                      <th key={h} style={{ padding: "6px 8px", textAlign: "left", fontSize: "10px", fontWeight: "600", color: "var(--muted)", letterSpacing: "0.05em", textTransform: "uppercase" }}>{h}</th>
-                    ))}
+                  <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="pb-3 pr-4">Descripción</th>
+                    <th className="pb-3 px-4 w-24 text-center">Cant.</th>
+                    <th className="pb-3 px-4 w-32 text-right">Precio unit.</th>
+                    <th className="pb-3 pl-4 w-36 text-right">Subtotal</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100">
                   {pr.items.map((item) => (
-                    <tr key={item.id} style={{ borderBottom: "1px solid var(--border)" }}>
-                      <td style={{ padding: "10px 8px", fontSize: "13px" }}>{item.description}</td>
-                      <td style={{ padding: "10px 8px", fontSize: "13px", color: "var(--muted)" }}>{item.quantity}</td>
-                      <td style={{ padding: "10px 8px", fontSize: "13px", color: "var(--muted)" }}>{formatCLP(item.unitPrice)}</td>
-                      <td style={{ padding: "10px 8px", fontSize: "13px", fontWeight: "600" }}>{formatCLP(item.quantity * item.unitPrice)}</td>
+                    <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="py-3.5 pr-4 text-xs font-medium text-slate-800">
+                        {item.description}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs text-slate-600 text-center">
+                        {item.quantity}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs text-slate-600 text-right">
+                        {formatCLP(item.unitPrice)}
+                      </td>
+                      <td className="py-3.5 pl-4 text-xs font-bold text-slate-900 text-right">
+                        {formatCLP(item.quantity * item.unitPrice)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr>
-                    <td colSpan={3} style={{ padding: "12px 8px", textAlign: "right", fontSize: "12px", color: "var(--muted)", fontWeight: "600" }}>Total</td>
-                    <td style={{ padding: "12px 8px", fontSize: "16px", fontWeight: "800" }}>{formatCLP(pr.totalAmount)}</td>
+                  <tr className="border-t-2 border-slate-100">
+                    <td colSpan={3} className="pt-4 pr-4 text-right text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      Total estimado
+                    </td>
+                    <td className="pt-4 pl-4 text-right text-base font-extrabold text-slate-900">
+                      {formatCLP(pr.totalAmount)}
+                    </td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           </section>
 
-          {canReview && (
-            <ReviewForm requestId={pr.id} />
-          )}
+          {canReview && <ReviewForm requestId={pr.id} />}
 
           {canSubmit && (
-            <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px" }}>
-              <h2 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "12px" }}>
-                Acciones
-              </h2>
-              <div style={{ display: "flex", gap: "10px" }}>
+            <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col gap-4">
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                  Acciones disponibles
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">
+                  Tu solicitud está en borrador. Puedes editarla o enviarla para su revisión por parte de tu jefatura.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap pt-2 border-t border-slate-100">
                 {canEdit && (
                   <Link
                     href={`/dashboard/requests/${pr.id}/edit`}
-                    style={{ padding: "8px 16px", borderRadius: "7px", background: "var(--neutral-700)", border: "1px solid var(--border)", color: "var(--text)", fontSize: "13px", fontWeight: "500", textDecoration: "none" }}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all inline-flex items-center gap-1.5"
                   >
-                     Editar
+                    ✏️ Editar solicitud
                   </Link>
                 )}
                 <SubmitButton requestId={pr.id} />
@@ -251,57 +291,57 @@ export default async function RequestDetailPage({
           )}
         </div>
 
-        <div>
-          <section style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "10px", padding: "20px" }}>
-            <h2 style={{ fontSize: "11px", fontWeight: "700", color: "var(--muted)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "16px" }}>
-              Historial
+        <aside className="lg:col-span-1 lg:sticky lg:top-6 flex flex-col gap-6">
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col gap-5">
+            <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 pb-3 border-b border-slate-100">
+              Historial de la solicitud
             </h2>
 
             {pr.history.length === 0 ? (
-              <p style={{ fontSize: "12px", color: "var(--muted)" }}>Sin historial aún.</p>
+              <p className="text-xs text-slate-400">Sin historial registrado.</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+              <div className="flex flex-col">
                 {pr.history.map((entry, idx) => {
                   const isLast = idx === pr.history.length - 1;
                   const cfg = STATUS_CONFIG[entry.toStatus];
                   return (
-                    <div key={entry.id} style={{ display: "flex", gap: "12px" }}>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                        <div style={{
-                          width: "10px", height: "10px", borderRadius: "50%",
-                          background: cfg.color, flexShrink: 0, marginTop: "3px",
-                        }} />
-                        {!isLast && <div style={{ width: "1px", flex: 1, background: "var(--border)", minHeight: "24px" }} />}
+                    <div key={entry.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-2.5 h-2.5 rounded-full ${cfg.dotClass} shrink-0 mt-1`} />
+                        {!isLast && <div className="w-px flex-1 bg-slate-200 min-h-6 my-1" />}
                       </div>
-                      <div style={{ paddingBottom: isLast ? 0 : "16px", flex: 1 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "6px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: "600", color: cfg.color }}>
+                      <div className={`flex-1 ${isLast ? "pb-0" : "pb-5"}`}>
+                        <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                          <span className="text-xs font-bold text-slate-800">
                             {HISTORY_LABEL[entry.toStatus]}
                           </span>
-                          {entry.actor && (
-                            <span style={{ fontSize: "11px", color: "var(--muted)" }}>
-                              por <strong style={{ color: "var(--neutral-300)" }}>{entry.actor.name}</strong>
-                              {entry.actor.role && (
-                                <span style={{ fontSize: "10px", marginLeft: "4px", color: "var(--muted)" }}>
-                                  ({entry.actor.role === "REQUESTER" ? "Solicitante" : entry.actor.role === "MANAGER" ? "Jefatura" : "Finanzas"})
-                                </span>
-                              )}
-                            </span>
-                          )}
+                          <span className="text-[10px] text-slate-400">
+                            {formatDate(entry.createdAt)}
+                          </span>
                         </div>
+
+                        {entry.actor && (
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            por <strong className="text-slate-700">{entry.actor.name}</strong>{" "}
+                            {entry.actor.role && (
+                              <span className="text-slate-400">
+                                ({entry.actor.role === "REQUESTER" ? "Solicitante" : entry.actor.role === "MANAGER" ? "Jefatura" : "Finanzas"})
+                              </span>
+                            )}
+                          </p>
+                        )}
+
                         {entry.comment && (
-                          <div style={{
-                            marginTop: "6px", fontSize: "11px", color: "var(--neutral-300)",
-                            background: "var(--neutral-800)", borderRadius: "6px",
-                            padding: "6px 8px", lineHeight: "1.5",
-                            borderLeft: entry.toStatus === "REJECTED" ? "3px solid #ef4444" : "3px solid var(--border)",
-                          }}>
+                          <div
+                            className={`mt-2 p-2.5 rounded-xl text-xs leading-relaxed ${
+                              entry.toStatus === "REJECTED"
+                                ? "bg-red-50 text-red-700 border border-red-200"
+                                : "bg-slate-50 text-slate-700 border border-slate-200/80"
+                            }`}
+                          >
                             &ldquo;{entry.comment}&rdquo;
                           </div>
                         )}
-                        <div style={{ fontSize: "10px", color: "var(--muted)", marginTop: "4px" }}>
-                          {formatDate(entry.createdAt)}
-                        </div>
                       </div>
                     </div>
                   );
@@ -309,13 +349,13 @@ export default async function RequestDetailPage({
               </div>
             )}
 
-            <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div className="pt-4 border-t border-slate-100 flex flex-col gap-2 text-xs">
               {pr.requester && <MetaRow label="Solicitante" value={pr.requester.name} />}
               <MetaRow label="Creada" value={formatDate(pr.createdAt)} />
               <MetaRow label="Actualizada" value={formatDate(pr.updatedAt)} />
             </div>
           </section>
-        </div>
+        </aside>
       </div>
     </div>
   );
@@ -323,9 +363,9 @@ export default async function RequestDetailPage({
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
-      <span style={{ color: "var(--muted)" }}>{label}</span>
-      <span style={{ color: "var(--neutral-300)" }}>{value}</span>
+    <div className="flex justify-between items-center py-1 border-b border-slate-50 last:border-b-0">
+      <span className="text-slate-400">{label}</span>
+      <span className="font-semibold text-slate-700">{value}</span>
     </div>
   );
 }

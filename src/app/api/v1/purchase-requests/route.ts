@@ -1,28 +1,3 @@
-/**
- * POST /api/v1/purchase-requests
- * GET  /api/v1/purchase-requests
- *
- * HU-19 a HU-23: API externa para integración de sistemas.
- *
- * Autenticación:
- *   - X-API-Key o Authorization: Bearer <key> (HU-19).
- *   - companyId viene SIEMPRE de la API Key.
- *
- * Manejo de errores unificado (HU-21):
- *   - Formato único: { error: { code, message, details[] } }
- *   - 400: JSON inválido
- *   - 401: API Key ausente, inválida o revocada
- *   - 409: Duplicado (mismo payload en empresa o conflicto de external_id)
- *   - 422: Validación por campo (Zod) o falta de requester
- *   - 429: Límite de tasa excedido
- *   - 500: Error interno no controlado
- *
- * Idempotencia (HU-22):
- *   - Soporta external_id en body o header Idempotency-Key
- *   - Reintento con mismo payload retorna 200 (idempotent: true)
- *   - Reintento con payload distinto retorna 409 (IDEMPOTENCY_CONFLICT)
- */
-
 import crypto from "crypto";
 import { NextRequest } from "next/server";
 import { db } from "@/prisma/db";
@@ -31,16 +6,15 @@ import { apiKeyGuard } from "@/lib/api-key-guard";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { apiCreateRequestSchema, listRequestsQuerySchema } from "@/lib/schemas/request.schema";
 
-// ─── GET /api/v1/purchase-requests ───────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
   try {
-    // 1. Autenticar con API Key (HU-19: 401 si falta o es inválida)
+
     const guard = await apiKeyGuard(request);
     if (!guard.ok) return guard.response;
     const { companyId, apiKeyId } = guard.context;
 
-    // 2. Control de tasa (HU-21: 429 si hay rate limit)
+
     const rateCheck = checkRateLimit(apiKeyId);
     if (!rateCheck.allowed) {
       const res = apiError(
@@ -55,16 +29,15 @@ export async function GET(request: NextRequest) {
       return res;
     }
 
-    // 3. Parsear query params
     const { searchParams } = request.nextUrl;
     const parsed = listRequestsQuerySchema.safeParse({
-      search:     searchParams.get("search")     ?? undefined,
-      status:     searchParams.get("status")     ?? undefined,
+      search: searchParams.get("search") ?? undefined,
+      status: searchParams.get("status") ?? undefined,
       costCenter: searchParams.get("costCenter") ?? undefined,
-      minAmount:  searchParams.get("minAmount")  ?? undefined,
-      maxAmount:  searchParams.get("maxAmount")  ?? undefined,
-      page:       searchParams.get("page")       ?? undefined,
-      pageSize:   searchParams.get("pageSize")   ?? undefined,
+      minAmount: searchParams.get("minAmount") ?? undefined,
+      maxAmount: searchParams.get("maxAmount") ?? undefined,
+      page: searchParams.get("page") ?? undefined,
+      pageSize: searchParams.get("pageSize") ?? undefined,
     });
 
     if (!parsed.success) {
@@ -79,8 +52,8 @@ export async function GET(request: NextRequest) {
     const { search, status, costCenter, minAmount, maxAmount, page, pageSize } = parsed.data;
 
     let query = db.orm.public.PurchaseRequest.where((r) => r.companyId.eq(companyId));
-    if (status)                  query = query.where((r) => r.status.eq(status));
-    if (costCenter)              query = query.where((r) => r.costCenter.eq(costCenter));
+    if (status) query = query.where((r) => r.status.eq(status));
+    if (costCenter) query = query.where((r) => r.costCenter.eq(costCenter));
     if (minAmount !== undefined) query = query.where((r) => r.totalAmount.gte(minAmount));
     if (maxAmount !== undefined) query = query.where((r) => r.totalAmount.lte(maxAmount));
 
@@ -99,9 +72,9 @@ export async function GET(request: NextRequest) {
 
     allItems.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
-    const total  = allItems.length;
+    const total = allItems.length;
     const offset = (page - 1) * pageSize;
-    const items  = allItems.slice(offset, offset + pageSize);
+    const items = allItems.slice(offset, offset + pageSize);
 
     const response = apiSuccess({
       data: items,
@@ -117,16 +90,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ─── POST /api/v1/purchase-requests ──────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   try {
-    // 1. Autenticar con API Key (HU-19: 401 si ausente o inválida)
+
     const guard = await apiKeyGuard(request);
     if (!guard.ok) return guard.response;
     const { companyId, apiKeyId } = guard.context;
 
-    // 2. Control de tasa (HU-21: 429 si supera el límite)
     const rateCheck = checkRateLimit(apiKeyId);
     if (!rateCheck.allowed) {
       const res = apiError(
@@ -141,7 +112,6 @@ export async function POST(request: NextRequest) {
       return res;
     }
 
-    // 3. Parsear body (HU-21: 400 si el JSON está malformado)
     let body: unknown;
     try {
       body = await request.json();
@@ -149,7 +119,6 @@ export async function POST(request: NextRequest) {
       return apiError(400, "INVALID_JSON", "El cuerpo de la petición no es JSON válido.");
     }
 
-    // Extraer external_id opcional de body o headers
     const extBody = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
     const headerIdempotencyKey =
       request.headers.get("Idempotency-Key") || request.headers.get("X-External-Id");
@@ -157,13 +126,11 @@ export async function POST(request: NextRequest) {
       typeof extBody.external_id === "string" && extBody.external_id.trim().length > 0
         ? extBody.external_id.trim()
         : typeof extBody.externalId === "string" && extBody.externalId.trim().length > 0
-        ? extBody.externalId.trim()
-        : (headerIdempotencyKey ? headerIdempotencyKey.trim() : null);
+          ? extBody.externalId.trim()
+          : (headerIdempotencyKey ? headerIdempotencyKey.trim() : null);
 
     const externalId = rawExternalId && rawExternalId.length > 0 ? rawExternalId : null;
 
-    // 4. Validar campos requeridos con Zod (HU-21: 422 para errores de validación)
-    // Se usa apiCreateRequestSchema que valida los campos e ignora de forma segura companyId si viene en el body (HU-20)
     const parsed = apiCreateRequestSchema.safeParse(body);
     if (!parsed.success) {
       return apiError(
@@ -179,7 +146,6 @@ export async function POST(request: NextRequest) {
 
     const { title, description, costCenter, items } = parsed.data;
 
-    // 5. Calcular payload_hash normalizado para idempotencia y detección de duplicados
     const normalizedPayload = {
       title: title.trim(),
       description: (description ?? "").trim(),
@@ -195,7 +161,6 @@ export async function POST(request: NextRequest) {
       .update(JSON.stringify(normalizedPayload))
       .digest("hex");
 
-    // 6. Idempotencia por external_id (HU-21/HU-22)
     if (externalId) {
       const existingByExternalId = await db.orm.public.PurchaseRequest
         .where((r) => r.companyId.eq(companyId))
@@ -205,14 +170,12 @@ export async function POST(request: NextRequest) {
 
       if (existingByExternalId) {
         if (existingByExternalId.payloadHash === payloadHash) {
-          // Reintento idempotente exitoso → 200 OK
           const resp = apiSuccess({ data: existingByExternalId, idempotent: true }, 200);
           resp.headers.set("X-RateLimit-Limit", String(rateCheck.limit));
           resp.headers.set("X-RateLimit-Remaining", String(rateCheck.remaining));
           resp.headers.set("X-RateLimit-Reset", String(rateCheck.reset));
           return resp;
         } else {
-          // Conflicto de contenido diferente con el mismo external_id → 409
           return apiError(
             409,
             "IDEMPOTENCY_CONFLICT",
@@ -223,7 +186,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 7. Detección de duplicado por payload_hash cuando no se envía external_id (HU-21: 409 duplicado)
     if (!externalId) {
       const existingByPayload = await db.orm.public.PurchaseRequest
         .where((r) => r.companyId.eq(companyId))
@@ -241,7 +203,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 8. Buscar un usuario REQUESTER de la empresa para asociar como solicitante
     const requester = await db.orm.public.User
       .where((u) => u.companyId.eq(companyId))
       .where((u) => u.role.eq("REQUESTER"))
@@ -257,7 +218,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 9. Crear solicitud en DRAFT (trigger force_draft_on_insert)
     const requestId = crypto.randomUUID();
 
     await db.orm.public.PurchaseRequest.create({
@@ -272,7 +232,6 @@ export async function POST(request: NextRequest) {
       payloadHash,
     });
 
-    // 10. Insertar ítems (el trigger calcula total_amount en la BD)
     for (const item of items) {
       await db.orm.public.RequestItem.create({
         id: crypto.randomUUID(),
@@ -284,7 +243,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 11. Transición automática DRAFT → PENDING_MANAGER (HU-23)
     await db.orm.public.PurchaseRequest
       .where((r) => r.id.eq(requestId))
       .update({ status: "PENDING_MANAGER" });
@@ -299,7 +257,6 @@ export async function POST(request: NextRequest) {
       comment: "Solicitud creada automáticamente vía API.",
     });
 
-    // 12. Obtener solicitud creada con total calculado por el trigger
     const created = await db.orm.public.PurchaseRequest
       .where((r) => r.id.eq(requestId))
       .select(

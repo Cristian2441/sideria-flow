@@ -1,20 +1,9 @@
-/**
- * HU-10: Dashboard de solicitudes — Sideria Flow.
- * Rediseñado con Tailwind CSS + estética shadcn/ui exactamente como en la captura:
- * - Card blanca con esquinas redondeadas sobre fondo #f8fafc
- * - Título "Resultados" y contador "X SOLICITUDES"
- * - Tabla con título + descripción debajo
- * - Badges tipo píldora con punto indicador (En jefatura, En finanzas, Aprobada, Rechazada)
- * - Montos en formato $XXX.XXX
- * - Enlace azul "Ver ↗"
- */
-
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { db } from "@/prisma/db";
 import Link from "next/link";
 import type { PurchaseRequestStatus, UserRole } from "@/lib/types";
 
-// ─── Helpers visuales ─────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<
   PurchaseRequestStatus,
@@ -88,8 +77,6 @@ function formatSimpleDate(dateStr: string) {
   }
 }
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-
 interface Request {
   id: string;
   title: string;
@@ -114,16 +101,29 @@ export default async function DashboardRequestsPage({
   const search = sp.search ?? "";
   const status = sp.status ?? "";
   const costCenter = sp.costCenter ?? "";
-  const minAmt = sp.minAmount ?? "";
-  const maxAmt = sp.maxAmount ?? "";
+  const amount = sp.amount ?? "";
+  const date = sp.date ?? "";
 
-  // Query params para la API
+  let costCenterOptions: string[] = ["CC-TI", "CC-VENTAS", "CC-OPERACIONES", "CC-FINANZAS", "CC-RRHH", "CC-ADMIN"];
+  try {
+    const fromDb = await db.orm.public.PurchaseRequest
+      .where((r) => r.companyId.eq(session.companyId))
+      .select("costCenter")
+      .all();
+    const unique = Array.from(new Set(fromDb.map((r) => r.costCenter).filter(Boolean)));
+    if (unique.length > 0) {
+      costCenterOptions = Array.from(new Set([...unique, ...costCenterOptions]));
+    }
+  } catch {
+ 
+  }
+
   const qs = new URLSearchParams();
   if (search) qs.set("search", search);
   if (status) qs.set("status", status);
   if (costCenter) qs.set("costCenter", costCenter);
-  if (minAmt) qs.set("minAmount", minAmt);
-  if (maxAmt) qs.set("maxAmount", maxAmt);
+  if (amount) qs.set("amount", amount);
+  if (date) qs.set("date", date);
   qs.set("pageSize", "50");
 
   let requests: Request[] = [];
@@ -154,15 +154,15 @@ export default async function DashboardRequestsPage({
   }
 
   const role = session.role as UserRole;
-  const hasActiveFilters = Boolean(search || status || costCenter || minAmt || maxAmt);
+  const hasActiveFilters = Boolean(search || status || costCenter || amount || date);
 
   return (
     <div className="w-full max-w-[1240px] mx-auto flex flex-col gap-6">
-      {/* Barra de Filtros interactiva */}
+    
       <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
         <form method="GET" className="flex flex-wrap items-center gap-3">
-          {/* Input de Búsqueda */}
-          <div className="relative flex-1 min-w-[220px]">
+         
+          <div className="relative flex-1 min-w-[200px]">
             <input
               name="search"
               type="text"
@@ -173,11 +173,10 @@ export default async function DashboardRequestsPage({
             <span className="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
           </div>
 
-          {/* Filtro de Estado */}
           <select
             name="status"
             defaultValue={status}
-            className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500 min-w-[140px]"
+            className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500 min-w-[130px]"
           >
             <option value="">Todos los estados</option>
             <option value="DRAFT">Borrador</option>
@@ -187,18 +186,38 @@ export default async function DashboardRequestsPage({
             <option value="REJECTED">Rechazada</option>
           </select>
 
-          {/* Filtro de Centro de Costo */}
-          <input
+          <select
             name="costCenter"
-            type="text"
-            placeholder="Centro de costo..."
             defaultValue={costCenter}
-            className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 w-[140px]"
+            className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500 min-w-[140px]"
+          >
+            <option value="">Todos los centros</option>
+            {costCenterOptions.map((cc) => (
+              <option key={cc} value={cc}>{cc}</option>
+            ))}
+          </select>
+
+          <input
+            name="amount"
+            type="number"
+            min="0"
+            step="1000"
+            placeholder="Monto máx ($)..."
+            defaultValue={amount}
+            className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-blue-500 w-[125px]"
+          />
+
+          <input
+            name="date"
+            type="date"
+            defaultValue={date}
+            title="Filtrar por fecha exacta"
+            className="py-2 px-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 focus:outline-none focus:bg-white focus:border-blue-500"
           />
 
           <button
             type="submit"
-            className="px-4 py-2 bg-[#0066ff] hover:bg-blue-600 text-white font-medium text-xs rounded-xl transition-colors cursor-pointer"
+            className="px-4 py-2 bg-[#0066ff] hover:bg-blue-600 text-white font-medium text-xs rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             Filtrar
           </button>
@@ -206,7 +225,7 @@ export default async function DashboardRequestsPage({
           {hasActiveFilters && (
             <Link
               href="/dashboard/requests"
-              className="text-xs text-slate-500 hover:text-slate-800 underline px-2 py-1"
+              className="text-xs text-slate-500 hover:text-slate-800 underline px-2 py-1 font-medium"
             >
               Limpiar filtros
             </Link>
@@ -215,7 +234,7 @@ export default async function DashboardRequestsPage({
           {role === "REQUESTER" && (
             <Link
               href="/dashboard/requests/new"
-              className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-sm transition-all"
+              className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-xl shadow-xs transition-all"
             >
               <span>+</span> Nueva solicitud
             </Link>
@@ -229,9 +248,8 @@ export default async function DashboardRequestsPage({
         </div>
       )}
 
-      {/* ── Tarjeta de Resultados (Calcada a la Maqueta) ── */}
       <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8">
-        {/* Cabecera de la Tarjeta */}
+        
         <div className="flex items-center justify-between pb-6 border-b border-slate-100">
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Resultados
@@ -241,7 +259,6 @@ export default async function DashboardRequestsPage({
           </span>
         </div>
 
-        {/* Estado Vacío */}
         {requests.length === 0 && !error ? (
           <div className="text-center py-16 flex flex-col items-center justify-center gap-3">
             <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-xl text-slate-400">
@@ -256,7 +273,7 @@ export default async function DashboardRequestsPage({
           </div>
         ) : (
           <>
-            {/* ── Vista Tabla para Escritorio (>= 768px) ── */}
+            
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -285,7 +302,7 @@ export default async function DashboardRequestsPage({
                       key={req.id}
                       className="hover:bg-slate-50/70 transition-colors group"
                     >
-                      {/* Título + Descripción */}
+                      
                       <td className="py-4 px-3 max-w-[320px]">
                         <div className="font-bold text-slate-900 text-sm tracking-tight leading-snug">
                           {req.title}
@@ -297,27 +314,22 @@ export default async function DashboardRequestsPage({
                         )}
                       </td>
 
-                      {/* Centro de Costo */}
                       <td className="py-4 px-3 text-sm text-slate-600 font-medium">
                         {req.costCenter}
                       </td>
 
-                      {/* Monto */}
                       <td className="py-4 px-3 text-sm font-bold text-slate-900">
                         {formatCLP(req.totalAmount)}
                       </td>
 
-                      {/* Estado */}
                       <td className="py-4 px-3">
                         <StatusBadge status={req.status} />
                       </td>
 
-                      {/* Fecha */}
                       <td className="py-4 px-3 text-xs text-slate-500 whitespace-nowrap">
                         {formatSimpleDate(req.createdAt)}
                       </td>
 
-                      {/* Acción Ver ↗ */}
                       <td className="py-4 px-3 text-right whitespace-nowrap">
                         <Link
                           href={`/dashboard/requests/${req.id}`}
@@ -332,7 +344,6 @@ export default async function DashboardRequestsPage({
               </table>
             </div>
 
-            {/* ── Vista Tarjetas para Móvil (< 768px) ── */}
             <div className="md:hidden flex flex-col divide-y divide-slate-100">
               {requests.map((req) => (
                 <div key={req.id} className="py-4 flex flex-col gap-2.5">
