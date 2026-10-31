@@ -1,3 +1,4 @@
+"use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -34,7 +35,6 @@ export default function SubmitButton({ requestId }: SubmitButtonProps) {
 
       setShowConfirmModal(false);
       showToast("Solicitud enviada a aprobación exitosamente.", "success");
-
       router.refresh();
     } catch {
       const connErr = "Error de conexión. Intenta de nuevo.";
@@ -48,141 +48,56 @@ export default function SubmitButton({ requestId }: SubmitButtonProps) {
 
   return (
     <>
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <div className="flex flex-col gap-1.5">
         <button
           onClick={() => setShowConfirmModal(true)}
           disabled={loading}
-          style={{
-            padding: "11px 20px",
-            minHeight: "42px",
-            borderRadius: "7px",
-            background: loading ? "var(--neutral-600)" : "var(--brand-500)",
-            color: "#fff",
-            fontSize: "13px",
-            fontWeight: "600",
-            border: "none",
-            cursor: loading ? "default" : "pointer",
-            transition: "background 0.15s",
-          }}
+          className="px-4 py-2.5 bg-[#0066ff] hover:bg-blue-600 disabled:bg-blue-300 text-white text-xs font-semibold rounded-xl shadow-xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
         >
-          🚀 Enviar a aprobación
+          <span></span> Enviar a aprobación
         </button>
-        {error && (
-          <span style={{ fontSize: "11px", color: "#ef4444" }}>{error}</span>
-        )}
+        {error && <span className="text-[11px] text-red-500 font-medium">{error}</span>}
       </div>
 
       {showConfirmModal && (
         <div
           role="dialog"
           aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            padding: "20px",
-          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
           onClick={() => !loading && setShowConfirmModal(false)}
         >
           <div
-            style={{
-              background: "var(--surface)",
-              border: "1px solid rgba(59,92,245,0.4)",
-              borderRadius: "12px",
-              maxWidth: "460px",
-              width: "100%",
-              padding: "24px",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-            }}
+            className="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "50%",
-                  background: "rgba(59,92,245,0.15)",
-                  color: "var(--brand-400)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "20px",
-                  flexShrink: 0,
-                }}
-              >
-                🚀
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg bg-blue-100 text-blue-700 shrink-0">
+                
               </div>
               <div>
-                <h3
-                  style={{
-                    fontSize: "17px",
-                    fontWeight: "700",
-                    color: "var(--text)",
-                    margin: 0,
-                  }}
-                >
-                  ¿Enviar solicitud a aprobación?
+                <h3 className="text-base font-bold text-slate-900">
+                  ¿Enviar a aprobación?
                 </h3>
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "var(--muted)",
-                    margin: "4px 0 0 0",
-                  }}
-                >
-                  Una vez enviada, la solicitud pasará a revisión de jefatura y no podrá volver a modificarse.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Una vez enviada, la solicitud pasará a revisión de tu jefatura y no podrá ser editada.
                 </p>
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "10px",
-                marginTop: "8px",
-              }}
-            >
+            <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
               <button
                 type="button"
-                disabled={loading}
                 onClick={() => setShowConfirmModal(false)}
-                style={{
-                  padding: "10px 18px",
-                  borderRadius: "7px",
-                  border: "1px solid var(--border)",
-                  background: "var(--neutral-800)",
-                  color: "var(--text)",
-                  fontSize: "13px",
-                  fontWeight: "500",
-                  cursor: loading ? "default" : "pointer",
-                }}
+                disabled={loading}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all"
               >
                 Cancelar
               </button>
               <button
                 type="button"
-                disabled={loading}
                 onClick={handleConfirmSubmit}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "7px",
-                  border: "none",
-                  background: loading ? "var(--neutral-600)" : "var(--brand-500)",
-                  color: "#fff",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  cursor: loading ? "default" : "pointer",
-                }}
+                disabled={loading}
+                className="px-4 py-2 bg-[#0066ff] hover:bg-blue-600 text-white text-xs font-semibold rounded-xl transition-all"
               >
                 {loading ? "Enviando..." : "Sí, enviar"}
               </button>

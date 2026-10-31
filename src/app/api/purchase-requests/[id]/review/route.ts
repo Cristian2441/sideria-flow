@@ -3,6 +3,11 @@ import { db } from "@/prisma/db";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { authGuard, companyGuard } from "@/lib/guards";
 import { reviewRequestSchema } from "@/lib/schemas/request.schema";
+import {
+  determineApprovedStatus,
+  isSelfApproval,
+  canReviewInStatus,
+} from "@/lib/business-rules";
 import { APPROVAL_THRESHOLD } from "@/lib/types";
 import type { PurchaseRequestStatus, UserRole } from "@/lib/types";
 
@@ -37,7 +42,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const cg = await companyGuard(pr.companyId, guard.session);
   if (!cg.ok) return cg.response;
 
-  if (pr.requesterId === session.userId) {
+  if (isSelfApproval(pr.requesterId, session.userId)) {
     return apiError(
       403,
       "SELF_APPROVAL_NOT_ALLOWED",
@@ -45,18 +50,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  if (role === "MANAGER" && pr.status !== "PENDING_MANAGER") {
+  if (!canReviewInStatus(role, pr.status)) {
     return apiError(
       409,
       "INVALID_STATE",
-      `MANAGER solo puede actuar sobre solicitudes en PENDING_MANAGER. Estado actual: ${pr.status}.`
-    );
-  }
-  if (role === "FINANCE" && pr.status !== "PENDING_FINANCE") {
-    return apiError(
-      409,
-      "INVALID_STATE",
-      `FINANCE solo puede actuar sobre solicitudes en PENDING_FINANCE. Estado actual: ${pr.status}.`
+      `${role} no puede actuar sobre solicitudes en estado ${pr.status}.`
     );
   }
 
@@ -81,11 +79,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (action === "REJECT") {
     newStatus = "REJECTED";
   } else {
-    if (role === "MANAGER") {
-      newStatus = pr.totalAmount > APPROVAL_THRESHOLD ? "PENDING_FINANCE" : "APPROVED";
-    } else {
-      newStatus = "APPROVED";
-    }
+    newStatus = determineApprovedStatus(role, pr.totalAmount);
   }
 
   const result = await db.orm.public.PurchaseRequest

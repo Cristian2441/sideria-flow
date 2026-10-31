@@ -332,17 +332,17 @@ Authorization: Bearer sf_alpha_key_1234567890abcdef
 
 La clave está asociada a una empresa; cualquier solicitud creada usará el `companyId` de esa clave, ignorando cualquier valor que venga en el body.
 
-### Registrar una solicitud de compra
+### Ejemplos con cURL (HU-23)
 
-**POST** `/api/v1/purchase-requests`
+#### 1. Creación exitosa (201 Created)
 
 ```bash
-curl -X POST https://tu-dominio.com/api/v1/purchase-requests \
+curl -X POST http://localhost:3000/api/v1/purchase-requests \
   -H "Content-Type: application/json" \
   -H "X-API-Key: sf_alpha_key_1234567890abcdef" \
   -d '{
-    "title": "Compra de monitores",
-    "description": "Monitores 27\" para el equipo de desarrollo",
+    "title": "Compra de monitores para TI",
+    "description": "5 monitores para el equipo de desarrollo",
     "costCenter": "CC-TI",
     "externalId": "ERP-2024-001",
     "items": [
@@ -355,17 +355,114 @@ curl -X POST https://tu-dominio.com/api/v1/purchase-requests \
   }'
 ```
 
-**Respuesta exitosa (201)**
-
+**Respuesta (201 Created):**
 ```json
 {
-  "id": "a1b2c3d4-...",
-  "status": "PENDING_MANAGER",
-  "totalAmount": 900000
+  "data": {
+    "id": "c1f73b64-18d4-4bb0-80ea-3e9bc6625841",
+    "title": "Compra de monitores para TI",
+    "description": "5 monitores para el equipo de desarrollo",
+    "costCenter": "CC-TI",
+    "status": "PENDING_MANAGER",
+    "totalAmount": 900000,
+    "source": "API",
+    "externalId": "ERP-2024-001",
+    "createdAt": "2026-10-30T15:00:00.000Z"
+  }
 }
 ```
 
-**Campos del body**
+#### 2. Error de autenticación (401 Unauthorized)
+
+```bash
+curl -X POST http://localhost:3000/api/v1/purchase-requests \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: clave_invalida_o_inexistente" \
+  -d '{ "title": "Prueba" }'
+```
+
+**Respuesta (401 Unauthorized):**
+```json
+{
+  "error": {
+    "code": "INVALID_API_KEY",
+    "message": "API Key inválida o no existe.",
+    "details": []
+  }
+}
+```
+
+#### 3. Error de validación de campos (422 Unprocessable Entity)
+
+```bash
+curl -X POST http://localhost:3000/api/v1/purchase-requests \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: sf_alpha_key_1234567890abcdef" \
+  -d '{
+    "title": "",
+    "description": "Falta información requerida",
+    "costCenter": "CC-TI",
+    "items": [
+      {
+        "description": "Item con datos erróneos",
+        "quantity": 0,
+        "unitPrice": -100
+      }
+    ]
+  }'
+```
+
+**Respuesta (422 Unprocessable Entity):**
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Error de validación en los campos de la solicitud.",
+    "details": [
+      { "field": "title", "message": "El título es requerido" },
+      { "field": "items.0.quantity", "message": "La cantidad mínima es 1" },
+      { "field": "items.0.unitPrice", "message": "El precio no puede ser negativo" }
+    ]
+  }
+}
+```
+
+#### 4. Conflicto / Duplicado (409 Conflict)
+
+```bash
+# Envío de solicitud con un externalId ya registrado con contenido distinto:
+curl -X POST http://localhost:3000/api/v1/purchase-requests \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: sf_alpha_key_1234567890abcdef" \
+  -d '{
+    "title": "Otro título distinto",
+    "description": "Contenido modificado",
+    "costCenter": "CC-VENTAS",
+    "externalId": "ERP-2024-001",
+    "items": [
+      {
+        "description": "Teclados",
+        "quantity": 2,
+        "unitPrice": 45000
+      }
+    ]
+  }'
+```
+
+**Respuesta (409 Conflict):**
+```json
+{
+  "error": {
+    "code": "IDEMPOTENCY_CONFLICT",
+    "message": "Ya existe una solicitud registrada con este external_id pero con datos diferentes.",
+    "details": [
+      { "field": "external_id", "message": "El external_id 'ERP-2024-001' ya está en uso con otro contenido." }
+    ]
+  }
+}
+```
+
+### Campos del body
 
 | Campo | Tipo | Requerido | Descripción |
 |---|---|---|---|

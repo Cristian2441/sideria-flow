@@ -75,120 +75,73 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
 
   return (
     <>
-      <section
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: "10px",
-          padding: "20px",
-        }}
-      >
-        <h2
-          style={{
-            fontSize: "11px",
-            fontWeight: "700",
-            color: "var(--muted)",
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            marginBottom: "16px",
-          }}
-        >
-          Revisión
-        </h2>
+      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 flex flex-col gap-4">
+        <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
+            Revisión de Solicitud
+          </h2>
+          <span className="text-[11px] text-slate-400 font-medium">Acción de revisor</span>
+        </div>
 
-        <form
-          onSubmit={handleOpenConfirmModal}
-          style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-        >
-       
-          <div style={{ display: "flex", gap: "8px" }}>
+        <form onSubmit={handleOpenConfirmModal} className="flex flex-col gap-4">
+  
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={() => {
                 setAction("APPROVE");
                 setError("");
               }}
-              style={{
-                flex: 1,
-                padding: "11px 16px",
-                minHeight: "44px",
-                borderRadius: "7px",
-                border: `2px solid ${action === "APPROVE" ? "#22c55e" : "var(--border)"}`,
-                background:
-                  action === "APPROVE" ? "rgba(34,197,94,0.1)" : "var(--neutral-800)",
-                color: action === "APPROVE" ? "#22c55e" : "var(--muted)",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
+              className={`p-3.5 rounded-xl font-semibold text-xs border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                action === "APPROVE"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-400 shadow-xs ring-2 ring-emerald-200"
+                  : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+              }`}
             >
-               Aprobar
+              <span className="text-base">✓</span>
+              <span>Aprobar solicitud</span>
             </button>
+
             <button
               type="button"
               onClick={() => {
                 setAction("REJECT");
                 setError("");
               }}
-              style={{
-                flex: 1,
-                padding: "11px 16px",
-                minHeight: "44px",
-                borderRadius: "7px",
-                border: `2px solid ${action === "REJECT" ? "#ef4444" : "var(--border)"}`,
-                background:
-                  action === "REJECT" ? "rgba(239,68,68,0.1)" : "var(--neutral-800)",
-                color: action === "REJECT" ? "#ef4444" : "var(--muted)",
-                fontSize: "13px",
-                fontWeight: "600",
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
+              className={`p-3.5 rounded-xl font-semibold text-xs border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                action === "REJECT"
+                  ? "bg-red-50 text-red-700 border-red-400 shadow-xs ring-2 ring-red-200"
+                  : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+              }`}
             >
-              Rechazar
+              <span className="text-base">✕</span>
+              <span>Rechazar solicitud</span>
             </button>
           </div>
 
           {action && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-              <label
-                style={{
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  color: "var(--neutral-300)",
-                }}
-              >
-                Comentario
-                {action === "REJECT" && (
-                  <span style={{ color: "#ef4444", marginLeft: "2px" }}>*</span>
-                )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                <span>
+                  Comentario {action === "REJECT" ? <span className="text-red-500">* (Obligatorio)</span> : <span className="text-slate-400 font-normal">(Opcional)</span>}
+                </span>
+                <span className="text-[11px] font-normal text-slate-400">{comment.length}/1000</span>
               </label>
               <textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
                 placeholder={
                   action === "REJECT"
-                    ? "Explica el motivo del rechazo (obligatorio)"
-                    : "Comentario opcional..."
+                    ? "Explica el motivo del rechazo para que el solicitante pueda corregirlo..."
+                    : "Puedes ingresar una observación o nota de aprobación (opcional)..."
                 }
                 rows={3}
                 maxLength={1000}
-                style={{
-                  background: "var(--neutral-800)",
-                  border: `1px solid ${error ? "#ef4444" : "var(--border)"}`,
-                  borderRadius: "7px",
-                  color: "var(--text)",
-                  padding: "10px 12px",
-                  fontSize: "14px",
-                  resize: "vertical",
-                  outline: "none",
-                  minHeight: "80px",
-                }}
+                className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 outline-none transition-all resize-y focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
+                  error ? "border-red-400 bg-red-50/20" : "border-slate-200/80"
+                }`}
               />
-              {error && (
-                <span style={{ fontSize: "11px", color: "#ef4444" }}>{error}</span>
-              )}
+              {error && <span className="text-[11px] text-red-500 font-medium">{error}</span>}
             </div>
           )}
 
@@ -196,27 +149,13 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
             <button
               type="submit"
               disabled={loading}
-              style={{
-                padding: "11px 16px",
-                minHeight: "44px",
-                borderRadius: "7px",
-                background:
-                  action === "APPROVE"
-                    ? loading
-                      ? "var(--neutral-600)"
-                      : "#22c55e"
-                    : loading
-                    ? "var(--neutral-600)"
-                    : "#ef4444",
-                color: "#fff",
-                fontSize: "13px",
-                fontWeight: "600",
-                border: "none",
-                cursor: loading ? "default" : "pointer",
-                transition: "opacity 0.15s",
-              }}
+              className={`w-full py-3 px-4 rounded-xl text-xs font-semibold text-white transition-all cursor-pointer shadow-xs ${
+                action === "APPROVE"
+                  ? "bg-emerald-600 hover:bg-emerald-700"
+                  : "bg-red-600 hover:bg-red-700"
+              }`}
             >
-              {action === "APPROVE" ? "Aprobar solicitud..." : "Rechazar solicitud..."}
+              {action === "APPROVE" ? "Continuar con aprobación..." : "Continuar con rechazo..."}
             </button>
           )}
         </form>
@@ -226,159 +165,57 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
         <div
           role="dialog"
           aria-modal="true"
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.75)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            padding: "20px",
-          }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs"
           onClick={() => !loading && setShowConfirmModal(false)}
         >
           <div
-            style={{
-              background: "var(--surface)",
-              border: `1px solid ${action === "APPROVE" ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.4)"}`,
-              borderRadius: "12px",
-              maxWidth: "460px",
-              width: "100%",
-              padding: "24px",
-              boxShadow: "0 20px 40px rgba(0,0,0,0.6)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-            }}
+            className="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 flex flex-col gap-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div className="flex items-center gap-3">
               <div
-                style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "50%",
-                  background:
-                    action === "APPROVE"
-                      ? "rgba(34,197,94,0.15)"
-                      : "rgba(239,68,68,0.15)",
-                  color: action === "APPROVE" ? "#22c55e" : "#ef4444",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "20px",
-                  fontWeight: "bold",
-                  flexShrink: 0,
-                }}
+                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg shrink-0 ${
+                  action === "APPROVE" ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                }`}
               >
                 {action === "APPROVE" ? "✓" : "!"}
               </div>
               <div>
-                <h3
-                  style={{
-                    fontSize: "17px",
-                    fontWeight: "700",
-                    color: "var(--text)",
-                    margin: 0,
-                  }}
-                >
-                  {action === "APPROVE"
-                    ? "¿Confirmar aprobación?"
-                    : "¿Confirmar rechazo de solicitud?"}
+                <h3 className="text-base font-bold text-slate-900">
+                  {action === "APPROVE" ? "¿Confirmar aprobación?" : "¿Confirmar rechazo de solicitud?"}
                 </h3>
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "var(--muted)",
-                    margin: "4px 0 0 0",
-                  }}
-                >
-                  {action === "APPROVE"
-                    ? "Esta acción avanzará la solicitud de acuerdo a la matriz de aprobación configurada."
-                    : "La solicitud quedará rechazada de forma permanente."}
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Esta acción quedará registrada permanentemente en el historial.
                 </p>
               </div>
             </div>
 
-            {action === "REJECT" && comment && (
-              <div
-                style={{
-                  background: "rgba(239, 68, 68, 0.08)",
-                  borderLeft: "3px solid #ef4444",
-                  padding: "10px 14px",
-                  borderRadius: "4px",
-                  fontSize: "13px",
-                  color: "var(--neutral-200)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: "600",
-                    color: "#ef4444",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Motivo ingresado:
-                </div>
-                &ldquo;{comment}&rdquo;
+            {action === "REJECT" && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                <strong>Motivo:</strong> &ldquo;{comment}&rdquo;
               </div>
             )}
 
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "10px",
-                marginTop: "8px",
-              }}
-            >
+            <div className="flex gap-2 justify-end pt-2 border-t border-slate-100">
               <button
                 type="button"
-                disabled={loading}
                 onClick={() => setShowConfirmModal(false)}
-                style={{
-                  padding: "10px 18px",
-                  borderRadius: "7px",
-                  border: "1px solid var(--border)",
-                  background: "var(--neutral-800)",
-                  color: "var(--text)",
-                  fontSize: "13px",
-                  fontWeight: "500",
-                  cursor: loading ? "default" : "pointer",
-                }}
+                disabled={loading}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all"
               >
                 Cancelar
               </button>
               <button
                 type="button"
-                disabled={loading}
                 onClick={handleConfirmReview}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "7px",
-                  border: "none",
-                  background:
-                    action === "APPROVE"
-                      ? loading
-                        ? "var(--neutral-600)"
-                        : "#22c55e"
-                      : loading
-                      ? "var(--neutral-600)"
-                      : "#ef4444",
-                  color: "#fff",
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  cursor: loading ? "default" : "pointer",
-                }}
+                disabled={loading}
+                className={`px-4 py-2 text-white text-xs font-semibold rounded-xl transition-all ${
+                  action === "APPROVE"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-red-600 hover:bg-red-700"
+                }`}
               >
-                {loading
-                  ? "Procesando..."
-                  : action === "APPROVE"
-                  ? "Sí, aprobar"
-                  : "Sí, rechazar"}
+                {loading ? "Procesando..." : action === "APPROVE" ? "Sí, aprobar" : "Sí, rechazar"}
               </button>
             </div>
           </div>
