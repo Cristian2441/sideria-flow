@@ -4,7 +4,6 @@ import { db } from "@/prisma/db";
 import Link from "next/link";
 import type { PurchaseRequestStatus, UserRole } from "@/lib/types";
 
-
 const STATUS_CONFIG: Record<
   PurchaseRequestStatus,
   { label: string; bg: string; text: string; border: string; dot: string }
@@ -77,7 +76,7 @@ function formatSimpleDate(dateStr: string) {
   }
 }
 
-interface Request {
+interface RequestItem {
   id: string;
   title: string;
   description?: string;
@@ -105,7 +104,11 @@ export default async function DashboardRequestsPage({
   const date = sp.date ?? "";
 
   let costCenterOptions: string[] = ["CC-TI", "CC-VENTAS", "CC-OPERACIONES", "CC-FINANZAS", "CC-RRHH", "CC-ADMIN"];
+  let requests: RequestItem[] = [];
+  let error = "";
+
   try {
+    // 1. Opciones de centro de costo de la empresa
     const fromDb = await db.orm.public.PurchaseRequest
       .where((r) => r.companyId.eq(session.companyId))
       .select("costCenter")
@@ -114,43 +117,68 @@ export default async function DashboardRequestsPage({
     if (unique.length > 0) {
       costCenterOptions = Array.from(new Set([...unique, ...costCenterOptions]));
     }
-  } catch {
- 
-  }
 
-  const qs = new URLSearchParams();
-  if (search) qs.set("search", search);
-  if (status) qs.set("status", status);
-  if (costCenter) qs.set("costCenter", costCenter);
-  if (amount) qs.set("amount", amount);
-  if (date) qs.set("date", date);
-  qs.set("pageSize", "50");
+    // 2. Consulta directa a la Base de Datos (aislamiento multi-tenant estricto)
+    let query = db.orm.public.PurchaseRequest
+      .where((r) => r.companyId.eq(session.companyId));
 
-  let requests: Request[] = [];
-  let error = "";
-
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-    const { cookies } = await import("next/headers");
-    const cookieStore = await cookies();
-    const cookieHeader = cookieStore
-      .getAll()
-      .map((c) => `${c.name}=${c.value}`)
-      .join("; ");
-
-    const res = await fetch(`${baseUrl}/api/purchase-requests?${qs.toString()}`, {
-      headers: { Cookie: cookieHeader },
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      const data = (await res.json()) as { data: Request[] };
-      requests = data.data ?? [];
-    } else {
-      error = "Error al cargar las solicitudes.";
+    if (session.role === "REQUESTER") {
+      query = query.where((r) => r.requesterId.eq(session.userId));
     }
-  } catch {
-    error = "No se pudo conectar con el servidor.";
+
+    if (status) {
+      query = query.where((r) => r.status.eq(status));
+    }
+
+    if (amount) {
+      const maxAmt = Number(amount);
+      if (!isNaN(maxAmt)) {
+        query = query.where((r) => r.totalAmount.lte(maxAmt));
+      }
+    }
+
+    let allItems = await query
+      .select(
+        "id", "title", "description", "costCenter", "status",
+        "totalAmount", "source", "requesterId", "companyId",
+        "externalId", "createdAt", "updatedAt"
+      )
+      .all();
+
+    // Filtros en memoria para texto, centros y fechas
+    if (search) {
+      const q = search.toLowerCase();
+      allItems = allItems.filter(
+        (item) =>
+          item.title.toLowerCase().includes(q) ||
+          (item.description && item.description.toLowerCase().includes(q))
+      );
+    }
+
+    if (costCenter) {
+      const cc = costCenter.trim().toLowerCase();
+      allItems = allItems.filter((item) => item.costCenter.trim().toLowerCase() === cc);
+    }
+
+    if (date) {
+      allItems = allItems.filter((item) => {
+        const d = new Date(item.createdAt);
+        const isoDay = d.toISOString().slice(0, 10);
+        const localDay = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        return isoDay === date || localDay === date;
+      });
+    }
+
+    allItems.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+
+    requests = allItems.map((r) => ({
+      ...r,
+      status: r.status as PurchaseRequestStatus,
+      totalAmount: Number(r.totalAmount),
+    }));
+  } catch (err) {
+    console.error("Error al obtener solicitudes:", err);
+    error = "Error al conectar con la base de datos.";
   }
 
   const role = session.role as UserRole;
@@ -158,10 +186,8 @@ export default async function DashboardRequestsPage({
 
   return (
     <div className="w-full max-w-[1240px] mx-auto flex flex-col gap-6">
-    
       <div className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
         <form method="GET" className="flex flex-wrap items-center gap-3">
-         
           <div className="relative flex-1 min-w-[200px]">
             <input
               name="search"
@@ -249,7 +275,6 @@ export default async function DashboardRequestsPage({
       )}
 
       <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8">
-        
         <div className="flex items-center justify-between pb-6 border-b border-slate-100">
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">
             Resultados
@@ -273,7 +298,6 @@ export default async function DashboardRequestsPage({
           </div>
         ) : (
           <>
-            
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -302,7 +326,6 @@ export default async function DashboardRequestsPage({
                       key={req.id}
                       className="hover:bg-slate-50/70 transition-colors group"
                     >
-                      
                       <td className="py-4 px-3 max-w-[320px]">
                         <div className="font-bold text-slate-900 text-sm tracking-tight leading-snug">
                           {req.title}
