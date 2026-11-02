@@ -26,7 +26,7 @@ export const requestItemSchema = z.object({
   unitPrice: z
     .number()
     .int("El precio unitario debe ser un número entero (CLP sin decimales)")
-    .min(0, "El precio no puede ser negativo")
+    .min(1, "El precio unitario debe ser mayor a 0 (mínimo $1 CLP)")
     .max(MAX_UNIT_PRICE, `El precio unitario máximo es ${MAX_UNIT_PRICE}`),
 });
 
@@ -37,9 +37,11 @@ const itemsArray = z
   .min(1, "Debe incluir al menos un producto")
   .max(100, "Máximo 100 productos por solicitud")
   .refine(
-    (items) =>
-      items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0) <= MAX_TOTAL_CLP,
-    { message: "El monto total supera el máximo permitido" }
+    (items) => {
+      const total = items.reduce((acc, i) => acc + i.quantity * i.unitPrice, 0);
+      return total >= 1 && total <= MAX_TOTAL_CLP;
+    },
+    { message: "El monto total de la solicitud debe ser mayor a $0 CLP" }
   );
 
 const requestBase = z.object({

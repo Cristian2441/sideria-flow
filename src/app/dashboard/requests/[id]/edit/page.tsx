@@ -64,7 +64,7 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
   function subtotal(item: ItemRow): string {
     const q = parseInt(item.quantity, 10);
     const p = parseInt(item.unitPrice, 10);
-    if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
+    if (!isNaN(q) && !isNaN(p) && q > 0 && p > 0) {
       return new Intl.NumberFormat("es-CL", {
         style: "currency",
         currency: "CLP",
@@ -76,7 +76,7 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
   const totalAmount = items.reduce((s, i) => {
     const q = parseInt(i.quantity, 10);
     const p = parseInt(i.unitPrice, 10);
-    return s + (isNaN(q) || isNaN(p) ? 0 : q * p);
+    return s + (isNaN(q) || isNaN(p) || q <= 0 || p <= 0 ? 0 : q * p);
   }, 0);
 
   function formatCLP(amount: number) {
@@ -91,6 +91,24 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
     setErrors({});
     setServerError("");
 
+    const fe: FieldErrors = {};
+
+    items.forEach((item, idx) => {
+      const q = parseInt(item.quantity, 10);
+      const p = parseInt(item.unitPrice, 10);
+
+      if (!item.quantity || isNaN(q) || q < 1) {
+        fe[`items.${idx}.quantity`] = "La cantidad debe ser al menos 1";
+      }
+      if (!item.unitPrice || isNaN(p) || p < 1) {
+        fe[`items.${idx}.unitPrice`] = "El precio debe ser mayor a 0 (mínimo $1 CLP)";
+      }
+    });
+
+    if (totalAmount <= 0) {
+      fe["items"] = "El monto total de la solicitud debe ser mayor a $0 CLP";
+    }
+
     const payload = {
       title: title.trim(),
       description: description.trim(),
@@ -103,21 +121,22 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
     };
 
     const parsed = updateRequestSchema.safeParse(payload);
-    if (!parsed.success) {
-      const fe: FieldErrors = {};
-      for (const iss of parsed.error.issues) {
-        const p = iss.path.join(".");
-        if (!fe[p]) fe[p] = iss.message;
-      }
-      for (const iss of parsed.error.issues) {
-        if (iss.path[0] === "items" && typeof iss.path[1] === "number") {
-          const idx = iss.path[1];
-          const field = iss.path[2] as string;
-          fe[`items.${idx}.${field}`] = iss.message;
+    if (!parsed.success || Object.keys(fe).length > 0) {
+      if (!parsed.success) {
+        for (const iss of parsed.error.issues) {
+          const p = iss.path.join(".");
+          if (!fe[p]) fe[p] = iss.message;
         }
-      }
-      if (!fe["items"] && parsed.error.issues.some((i) => i.path[0] === "items" && i.path.length === 1)) {
-        fe["items"] = "Debe incluir al menos un producto";
+        for (const iss of parsed.error.issues) {
+          if (iss.path[0] === "items" && typeof iss.path[1] === "number") {
+            const idx = iss.path[1];
+            const field = iss.path[2] as string;
+            fe[`items.${idx}.${field}`] = iss.message;
+          }
+        }
+        if (!fe["items"] && parsed.error.issues.some((i) => i.path[0] === "items" && i.path.length === 1)) {
+          fe["items"] = "Debe incluir al menos un producto con precio válido";
+        }
       }
       setErrors(fe);
       return;
@@ -292,7 +311,7 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
                           maxLength={500}
                         />
                         {errors[`items.${idx}.description`] && (
-                          <span className="text-[10px] text-red-500 block mt-1">
+                          <span className="text-[10px] text-red-500 block mt-1 font-medium">
                             {errors[`items.${idx}.description`]}
                           </span>
                         )}
@@ -309,7 +328,7 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
                           }`}
                         />
                         {errors[`items.${idx}.quantity`] && (
-                          <span className="text-[10px] text-red-500 block mt-1">
+                          <span className="text-[10px] text-red-500 block mt-1 font-medium">
                             {errors[`items.${idx}.quantity`]}
                           </span>
                         )}
@@ -317,15 +336,16 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
                       <td className="py-3 px-3 align-top">
                         <input
                           type="number"
-                          min="0"
+                          min="1"
                           value={item.unitPrice}
                           onChange={(e) => updateItem(item.id, "unitPrice", e.target.value)}
+                          placeholder="Ej: 1000"
                           className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs text-slate-800 placeholder-slate-400 outline-none transition-all focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
                             errors[`items.${idx}.unitPrice`] ? "border-red-400 bg-red-50/20" : "border-slate-200/80"
                           }`}
                         />
                         {errors[`items.${idx}.unitPrice`] && (
-                          <span className="text-[10px] text-red-500 block mt-1">
+                          <span className="text-[10px] text-red-500 block mt-1 font-medium">
                             {errors[`items.${idx}.unitPrice`]}
                           </span>
                         )}
@@ -351,7 +371,6 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
               </table>
             </div>
 
-            
             <div className="flex md:hidden flex-col gap-4">
               {items.map((item, idx) => (
                 <div key={item.id} className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-xl flex flex-col gap-3">
@@ -375,6 +394,11 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
                       onChange={(e) => updateItem(item.id, "description", e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
                     />
+                    {errors[`items.${idx}.description`] && (
+                      <span className="text-[10px] text-red-500 font-medium">
+                        {errors[`items.${idx}.description`]}
+                      </span>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-1">
@@ -386,16 +410,27 @@ export default function EditRequestPage({ params }: { params: Promise<{ id: stri
                         onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
                       />
+                      {errors[`items.${idx}.quantity`] && (
+                        <span className="text-[10px] text-red-500 font-medium">
+                          {errors[`items.${idx}.quantity`]}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-[11px] font-semibold text-slate-600">Precio unit. ($)</label>
                       <input
                         type="number"
-                        min="0"
+                        min="1"
                         value={item.unitPrice}
                         onChange={(e) => updateItem(item.id, "unitPrice", e.target.value)}
+                        placeholder="Ej: 1000"
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
                       />
+                      {errors[`items.${idx}.unitPrice`] && (
+                        <span className="text-[10px] text-red-500 font-medium">
+                          {errors[`items.${idx}.unitPrice`]}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">

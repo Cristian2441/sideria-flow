@@ -66,7 +66,7 @@ export default function NewRequestForm({
   function subtotal(item: ItemRow): string {
     const q = parseInt(item.quantity, 10);
     const p = parseInt(item.unitPrice, 10);
-    if (!isNaN(q) && !isNaN(p) && q > 0 && p >= 0) {
+    if (!isNaN(q) && !isNaN(p) && q > 0 && p > 0) {
       return new Intl.NumberFormat("es-CL", {
         style: "currency",
         currency: "CLP",
@@ -78,7 +78,7 @@ export default function NewRequestForm({
   const totalAmount = items.reduce((sum, item) => {
     const q = parseInt(item.quantity, 10);
     const p = parseInt(item.unitPrice, 10);
-    return sum + (isNaN(q) || isNaN(p) ? 0 : q * p);
+    return sum + (isNaN(q) || isNaN(p) || q <= 0 || p <= 0 ? 0 : q * p);
   }, 0);
 
   function formatCLP(amount: number) {
@@ -93,6 +93,25 @@ export default function NewRequestForm({
     setErrors({});
     setServerError("");
 
+    const fieldErrors: FieldErrors = {};
+
+    // Validación previa explícita de precio y cantidad
+    items.forEach((item, idx) => {
+      const q = parseInt(item.quantity, 10);
+      const p = parseInt(item.unitPrice, 10);
+
+      if (!item.quantity || isNaN(q) || q < 1) {
+        fieldErrors[`items.${idx}.quantity`] = "La cantidad debe ser al menos 1";
+      }
+      if (!item.unitPrice || isNaN(p) || p < 1) {
+        fieldErrors[`items.${idx}.unitPrice`] = "El precio debe ser mayor a 0 (mínimo $1 CLP)";
+      }
+    });
+
+    if (totalAmount <= 0) {
+      fieldErrors["items"] = "El monto total de la solicitud debe ser mayor a $0 CLP";
+    }
+
     const payload: CreateRequestInput = {
       title: title.trim(),
       description: description.trim(),
@@ -105,21 +124,22 @@ export default function NewRequestForm({
     };
 
     const parsed = createRequestSchema.safeParse(payload);
-    if (!parsed.success) {
-      const fieldErrors: FieldErrors = {};
-      for (const issue of parsed.error.issues) {
-        const path = issue.path.join(".");
-        if (!fieldErrors[path]) fieldErrors[path] = issue.message;
-      }
-      for (const issue of parsed.error.issues) {
-        if (issue.path[0] === "items" && typeof issue.path[1] === "number") {
-          const idx = issue.path[1];
-          const field = issue.path[2] as string;
-          fieldErrors[`items.${idx}.${field}`] = issue.message;
+    if (!parsed.success || Object.keys(fieldErrors).length > 0) {
+      if (!parsed.success) {
+        for (const issue of parsed.error.issues) {
+          const path = issue.path.join(".");
+          if (!fieldErrors[path]) fieldErrors[path] = issue.message;
         }
-      }
-      if (!fieldErrors["items"] && parsed.error.issues.some((i) => i.path[0] === "items" && i.path.length === 1)) {
-        fieldErrors["items"] = "Debe incluir al menos un producto";
+        for (const issue of parsed.error.issues) {
+          if (issue.path[0] === "items" && typeof issue.path[1] === "number") {
+            const idx = issue.path[1];
+            const field = issue.path[2] as string;
+            fieldErrors[`items.${idx}.${field}`] = issue.message;
+          }
+        }
+        if (!fieldErrors["items"] && parsed.error.issues.some((i) => i.path[0] === "items" && i.path.length === 1)) {
+          fieldErrors["items"] = "Debe incluir al menos un producto con precio válido";
+        }
       }
       setErrors(fieldErrors);
       return;
@@ -140,11 +160,11 @@ export default function NewRequestForm({
 
       if (!res.ok) {
         if (data.error?.details) {
-          const fieldErrors: FieldErrors = {};
+          const srvFieldErrors: FieldErrors = {};
           for (const d of data.error.details) {
-            if (d.field) fieldErrors[d.field] = d.message;
+            if (d.field) srvFieldErrors[d.field] = d.message;
           }
-          setErrors(fieldErrors);
+          setErrors(srvFieldErrors);
         }
         setServerError(data.error?.message ?? "Error al crear la solicitud.");
         return;
@@ -312,7 +332,7 @@ export default function NewRequestForm({
                           maxLength={500}
                         />
                         {errors[`items.${idx}.description`] && (
-                          <span className="text-[10px] text-red-500 block mt-1">
+                          <span className="text-[10px] text-red-500 block mt-1 font-medium">
                             {errors[`items.${idx}.description`]}
                           </span>
                         )}
@@ -330,7 +350,7 @@ export default function NewRequestForm({
                           }`}
                         />
                         {errors[`items.${idx}.quantity`] && (
-                          <span className="text-[10px] text-red-500 block mt-1">
+                          <span className="text-[10px] text-red-500 block mt-1 font-medium">
                             {errors[`items.${idx}.quantity`]}
                           </span>
                         )}
@@ -338,16 +358,16 @@ export default function NewRequestForm({
                       <td className="py-3 px-3 align-top">
                         <input
                           type="number"
-                          min="0"
+                          min="1"
                           value={item.unitPrice}
                           onChange={(e) => updateItem(item.id, "unitPrice", e.target.value)}
-                          placeholder="0"
+                          placeholder="Ej: 1000"
                           className={`w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs text-slate-800 placeholder-slate-400 outline-none transition-all focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
                             errors[`items.${idx}.unitPrice`] ? "border-red-400 bg-red-50/20" : "border-slate-200/80"
                           }`}
                         />
                         {errors[`items.${idx}.unitPrice`] && (
-                          <span className="text-[10px] text-red-500 block mt-1">
+                          <span className="text-[10px] text-red-500 block mt-1 font-medium">
                             {errors[`items.${idx}.unitPrice`]}
                           </span>
                         )}
@@ -400,6 +420,11 @@ export default function NewRequestForm({
                       placeholder="Nombre del producto"
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
                     />
+                    {errors[`items.${idx}.description`] && (
+                      <span className="text-[10px] text-red-500 font-medium">
+                        {errors[`items.${idx}.description`]}
+                      </span>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="flex flex-col gap-1">
@@ -412,17 +437,27 @@ export default function NewRequestForm({
                         placeholder="1"
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
                       />
+                      {errors[`items.${idx}.quantity`] && (
+                        <span className="text-[10px] text-red-500 font-medium">
+                          {errors[`items.${idx}.quantity`]}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col gap-1">
                       <label className="text-[11px] font-semibold text-slate-600">Precio unit. ($)</label>
                       <input
                         type="number"
-                        min="0"
+                        min="1"
                         value={item.unitPrice}
                         onChange={(e) => updateItem(item.id, "unitPrice", e.target.value)}
-                        placeholder="0"
+                        placeholder="Ej: 1000"
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800"
                       />
+                      {errors[`items.${idx}.unitPrice`] && (
+                        <span className="text-[10px] text-red-500 font-medium">
+                          {errors[`items.${idx}.unitPrice`]}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
@@ -448,11 +483,11 @@ export default function NewRequestForm({
               </div>
               {totalAmount > 500000 ? (
                 <div className="mt-3 px-3 py-2 bg-amber-50 border border-amber-200/80 rounded-xl text-[11px] font-medium text-amber-800 text-left">
-                   <strong>Supera los $500.000:</strong> Requerirá aprobación de Jefatura y Finanzas.
+                  ⚠️ <strong>Supera los $500.000:</strong> Requerirá aprobación de Jefatura y Finanzas.
                 </div>
               ) : (
                 <div className="mt-3 px-3 py-2 bg-blue-50 border border-blue-200/80 rounded-xl text-[11px] font-medium text-blue-800 text-left">
-                  <strong>Hasta $500.000:</strong> Se aprueba directamente con Jefatura.
+                  ℹ️ <strong>Hasta $500.000:</strong> Se aprueba directamente con Jefatura.
                 </div>
               )}
             </div>
@@ -511,4 +546,3 @@ export default function NewRequestForm({
     </div>
   );
 }
-

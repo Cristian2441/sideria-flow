@@ -77,7 +77,7 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
 
   return (
     <>
-      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 flex flex-col gap-4">
+      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 flex flex-col gap-4 min-w-0">
         <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
             Revisión de Solicitud
@@ -122,7 +122,7 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
           </div>
 
           {action && (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 min-w-0">
               <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
                 <span>
                   Comentario {action === "REJECT" ? <span className="text-red-500">* (Obligatorio)</span> : <span className="text-slate-400 font-normal">(Opcional)</span>}
@@ -137,9 +137,9 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
                     ? "Explica el motivo del rechazo para que el solicitante pueda corregirlo..."
                     : "Puedes ingresar una observación o nota de aprobación (opcional)..."
                 }
-                rows={3}
+                rows={4}
                 maxLength={1000}
-                className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 outline-none transition-all resize-y focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
+                className={`w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 outline-none transition-all resize-y break-words [overflow-wrap:anywhere] focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${
                   error ? "border-red-400 bg-red-50/20" : "border-slate-200/80"
                 }`}
               />
@@ -171,7 +171,7 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
           onClick={() => !loading && setShowConfirmModal(false)}
         >
           <div
-            className="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 flex flex-col gap-4"
+            className="bg-white rounded-2xl border border-slate-100 shadow-xl max-w-md w-full p-6 flex flex-col gap-4 min-w-0"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3">
@@ -193,7 +193,7 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
             </div>
 
             {action === "REJECT" && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 break-words [overflow-wrap:anywhere] max-h-48 overflow-y-auto whitespace-pre-wrap">
                 <strong>Motivo:</strong> &ldquo;{comment}&rdquo;
               </div>
             )}
@@ -203,7 +203,7 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
                 type="button"
                 onClick={() => setShowConfirmModal(false)}
                 disabled={loading}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all cursor-pointer"
               >
                 Cancelar
               </button>
@@ -211,7 +211,7 @@ export default function ReviewForm({ requestId }: ReviewFormProps) {
                 type="button"
                 onClick={handleConfirmReview}
                 disabled={loading}
-                className={`px-4 py-2 text-white text-xs font-semibold rounded-xl transition-all ${
+                className={`px-4 py-2 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer ${
                   action === "APPROVE"
                     ? "bg-emerald-600 hover:bg-emerald-700"
                     : "bg-red-600 hover:bg-red-700"
