@@ -190,9 +190,9 @@ export default async function RequestDetailPage({
   const canReview = canReviewManager || canReviewFinance;
 
   return (
-    <div className="w-full max-w-[1240px] mx-auto flex flex-col gap-6">
+    <div className="w-full max-w-[1240px] mx-auto flex flex-col gap-6 min-w-0">
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3 min-w-0">
         <Link
           href="/dashboard/requests"
           className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors w-fit font-medium"
@@ -203,10 +203,10 @@ export default async function RequestDetailPage({
           Volver a solicitudes
         </Link>
 
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex flex-col gap-2">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 min-w-0">
+          <div className="flex flex-col gap-2 min-w-0 flex-1">
             <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-2xl font-bold text-slate-900 tracking-tight break-words [overflow-wrap:anywhere]">
                 {detail.title}
               </h1>
               <StatusBadge status={detail.status} />
@@ -229,7 +229,7 @@ export default async function RequestDetailPage({
             </div>
           </div>
 
-          <div className="md:text-right flex flex-col items-start md:items-end">
+          <div className="md:text-right flex flex-col items-start md:items-end shrink-0">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
               Monto Total
             </span>
@@ -245,20 +245,20 @@ export default async function RequestDetailPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start min-w-0">
 
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="lg:col-span-2 flex flex-col gap-6 min-w-0">
 
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8">
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 min-w-0">
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
               Descripción
             </h2>
-            <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap">
+            <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap break-words [overflow-wrap:anywhere] max-w-full">
               {detail.description}
             </p>
           </section>
 
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8">
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 md:p-8 min-w-0">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
               <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
                 Productos ({detail.items.length})
@@ -281,7 +281,7 @@ export default async function RequestDetailPage({
                 <tbody className="divide-y divide-slate-100">
                   {detail.items.map((item) => (
                     <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="py-3.5 pr-4 text-xs font-medium text-slate-800">
+                      <td className="py-3.5 pr-4 text-xs font-medium text-slate-800 break-words [overflow-wrap:anywhere]">
                         {item.description}
                       </td>
                       <td className="py-3.5 px-4 text-xs text-slate-600 text-center">
@@ -313,7 +313,7 @@ export default async function RequestDetailPage({
           {canReview && <ReviewForm requestId={detail.id} />}
 
           {canSubmit && (
-            <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col gap-4">
+            <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col gap-4 min-w-0">
               <div>
                 <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400">
                   Acciones disponibles
@@ -338,8 +338,8 @@ export default async function RequestDetailPage({
           )}
         </div>
 
-        <aside className="lg:col-span-1 lg:sticky lg:top-6 flex flex-col gap-6">
-          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col gap-5">
+        <aside className="lg:col-span-1 lg:sticky lg:top-6 flex flex-col gap-6 min-w-0 w-full">
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 flex flex-col gap-5 min-w-0 w-full overflow-hidden">
             <h2 className="text-xs font-bold uppercase tracking-widest text-slate-400 pb-3 border-b border-slate-100">
               Historial de la solicitud
             </h2>
@@ -347,28 +347,28 @@ export default async function RequestDetailPage({
             {detail.history.length === 0 ? (
               <p className="text-xs text-slate-400">Sin historial registrado.</p>
             ) : (
-              <div className="flex flex-col">
+              <div className="flex flex-col min-w-0 w-full">
                 {detail.history.map((entry, idx) => {
                   const isLast = idx === detail.history.length - 1;
                   const cfg = STATUS_CONFIG[entry.toStatus];
                   return (
-                    <div key={entry.id} className="flex gap-3">
-                      <div className="flex flex-col items-center">
+                    <div key={entry.id} className="flex gap-3 min-w-0 w-full">
+                      <div className="flex flex-col items-center shrink-0">
                         <div className={`w-2.5 h-2.5 rounded-full ${cfg.dotClass} shrink-0 mt-1`} />
                         {!isLast && <div className="w-px flex-1 bg-slate-200 min-h-6 my-1" />}
                       </div>
-                      <div className={`flex-1 ${isLast ? "pb-0" : "pb-5"}`}>
+                      <div className={`flex-1 min-w-0 w-full ${isLast ? "pb-0" : "pb-5"}`}>
                         <div className="flex items-baseline justify-between gap-2 flex-wrap">
                           <span className="text-xs font-bold text-slate-800">
                             {HISTORY_LABEL[entry.toStatus]}
                           </span>
-                          <span className="text-[10px] text-slate-400">
+                          <span className="text-[10px] text-slate-400 shrink-0">
                             {formatDate(entry.createdAt)}
                           </span>
                         </div>
 
                         {entry.actor && (
-                          <p className="text-[11px] text-slate-500 mt-0.5">
+                          <p className="text-[11px] text-slate-500 mt-0.5 truncate">
                             por <strong className="text-slate-700">{entry.actor.name}</strong>{" "}
                             {entry.actor.role && (
                               <span className="text-slate-400">
@@ -380,13 +380,15 @@ export default async function RequestDetailPage({
 
                         {entry.comment && (
                           <div
-                            className={`mt-2 p-2.5 rounded-xl text-xs leading-relaxed ${
+                            className={`mt-2 p-3 rounded-xl text-xs leading-relaxed break-words [overflow-wrap:anywhere] max-w-full overflow-hidden ${
                               entry.toStatus === "REJECTED"
                                 ? "bg-red-50 text-red-700 border border-red-200"
                                 : "bg-slate-50 text-slate-700 border border-slate-200/80"
                             }`}
                           >
-                            &ldquo;{entry.comment}&rdquo;
+                            <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] max-h-56 overflow-y-auto pr-1">
+                              &ldquo;{entry.comment}&rdquo;
+                            </p>
                           </div>
                         )}
                       </div>
@@ -410,9 +412,9 @@ export default async function RequestDetailPage({
 
 function MetaRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between items-center py-1 border-b border-slate-50 last:border-b-0">
-      <span className="text-slate-400">{label}</span>
-      <span className="font-semibold text-slate-700">{value}</span>
+    <div className="flex justify-between items-center py-1 border-b border-slate-50 last:border-b-0 gap-2">
+      <span className="text-slate-400 shrink-0">{label}</span>
+      <span className="font-semibold text-slate-700 truncate text-right">{value}</span>
     </div>
   );
 }

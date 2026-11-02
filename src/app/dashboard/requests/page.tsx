@@ -108,7 +108,7 @@ export default async function DashboardRequestsPage({
   let error = "";
 
   try {
-    // 1. Opciones de centro de costo de la empresa
+  
     const fromDb = await db.orm.public.PurchaseRequest
       .where((r) => r.companyId.eq(session.companyId))
       .select("costCenter")
@@ -118,7 +118,7 @@ export default async function DashboardRequestsPage({
       costCenterOptions = Array.from(new Set([...unique, ...costCenterOptions]));
     }
 
-    // 2. Consulta directa a la Base de Datos (aislamiento multi-tenant estricto)
+
     let query = db.orm.public.PurchaseRequest
       .where((r) => r.companyId.eq(session.companyId));
 
@@ -145,7 +145,6 @@ export default async function DashboardRequestsPage({
       )
       .all();
 
-    // Filtros en memoria para texto, centros y fechas
     if (search) {
       const q = search.toLowerCase();
       allItems = allItems.filter(
